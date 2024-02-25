@@ -68,15 +68,12 @@ parseCallExpr idName args s i =
     else if (fst curTok == TokChar ',')
         then parseCallExpr idName args s (snd curTok)
     else
-        case fst newArg of
-            NullAST -> (NullAST, snd newArg)
-            Error e -> newArg
-            _ -> if (nextWord == TokChar ')' || nextWord == TokChar ',')
-                    then parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
-                    else (Error "Expected ')' or ',' in argument list", snd curTok)    
+        if (nextWord == TokChar ')' || nextWord == TokChar ',')
+            then parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
+            else (Error "Expected ')' or ',' in argument list", snd curTok)    
      where
         curTok = getTok s i
-        newArg = parseExpression s (snd curTok)
+        newArg = parseExpression s i
         nextWord = fst (getTok s (snd newArg))
 
 -- primary ::= identifierexpr | numberexpr | parenexpr
