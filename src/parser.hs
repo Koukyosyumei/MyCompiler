@@ -67,14 +67,13 @@ parseCallExpr idName args s i =
         then (CallExprAST idName args, snd curTok)
     else if (fst curTok == TokChar ',')
         then parseCallExpr idName args s (snd curTok)
-    else
-        if (nextWord == TokChar ')' || nextWord == TokChar ',')
-            then parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
-            else (Error "Expected ')' or ',' in argument list", snd curTok)    
+    else 
+        case fst newArg of
+            Error e -> (Error e, snd newArg)
+            _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
      where
         curTok = getTok s i
         newArg = parseExpression s i
-        nextWord = fst (getTok s (snd newArg))
 
 -- primary ::= identifierexpr | numberexpr | parenexpr
 parsePrimary :: String -> Int -> (ExprAST, Int)
