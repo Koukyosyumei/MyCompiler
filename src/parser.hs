@@ -126,7 +126,7 @@ parseExpression s i =
 parsePrototype :: String -> Int -> (ExprAST, Int)
 parsePrototype s i =
     case (fst curTok) of
-        TokIDENTIFIER fname -> case (snd argNames) of
+        (TokIDENTIFIER fname) -> case (snd argNames) of
                                     (-1) -> (Error "Expected '(' in prototype", snd argNames)
                                     (-2) -> (Error "Expected ')' in prototype", snd argNames)
                                     _ -> (PrototypeAST fname (fst argNames), snd argNames)
@@ -139,17 +139,17 @@ parseArgNames :: String -> Int -> ([String], Int)
 parseArgNames s i =
     if (s !! i) /= '('
         then ([], -1)
-        else getArgNames [] s (i + 1) -- *arguments `)`
+        else getArgNames s (i + 1) -- *arguments `)`
     where
-        getArgNames :: [String] -> String -> Int -> ([String], Int)
-        getArgNames xs s i =
+        getArgNames :: String -> Int -> ([String], Int)
+        getArgNames s i =
             case (fst curTok) of
-                TokIDENTIFIER argname -> (xs ++ [argname] ++ (fst nextArgs), snd nextArgs)
-                TokChar ')'           -> (xs, snd curTok)
+                TokIDENTIFIER argname -> ([argname] ++ (fst nextArgs), snd nextArgs)
+                TokChar ')'           -> ([], snd curTok)
                 _                     -> ([], -2)
             where
                 curTok = getTok s i
-                nextArgs = getArgNames xs s (snd curTok)
+                nextArgs = getArgNames s (snd curTok)
 
 -- definition ::= 'def' prototype expression
 parseDefinition :: String -> Int -> (ExprAST, Int)
