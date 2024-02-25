@@ -16,6 +16,27 @@ data ExprAST = NumberExprAST Float
 binoPrecedence :: [(Char, Int)]
 binoPrecedence = [('<', 10), ('+', 20), ('-', 20), ('*', 40)]
 
+-- top ::= definition | external | expression | ;
+parseTop :: String -> Int -> [ExprAST] -> [ExprAST]
+parseTop s i es =
+    case (fst tokAndpos) of
+        TokEOF        -> es
+        (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
+        TokDEF        -> es ++ (handleDefinition s (snd tokAndpos))
+        TokEXTERN     -> es ++ (handleExtern s (snd tokAndpos))
+        _             -> es ++ (handleTopLevelExpression s (snd tokAndpos))
+    where
+        tokAndpos = getTok s i
+
+handleDefinition :: String -> Int -> [ExprAST]
+handleDefinition s i = [fst (parseDefinition s i)]
+
+handleExtern :: String -> Int -> [ExprAST]
+handleExtern s i = [fst (parseExtern s i)]
+
+handleTopLevelExpression :: String -> Int -> [ExprAST]
+handleTopLevelExpression s i = [fst (parseTopLevelExpr s i)]
+
 parseNumberExpr :: Float -> Int -> (ExprAST, Int)
 parseNumberExpr val i = (NumberExprAST val, i)
 
@@ -71,7 +92,7 @@ getTokPrecedence c =
 
 isError :: ExprAST -> Bool
 isError (Error _) = True
-isError _ = False
+isError _         = False
 
 -- binoprhs ::= (+ primary)*
 parseBinOpRHS :: Int -> ExprAST -> String -> Int -> (ExprAST, Int)
@@ -100,3 +121,63 @@ parseExpression s i =
         if (fst lhs) == NullAST
             then lhs
             else parseBinOpRHS 0 (fst lhs) s i
+
+
+parsePrototype :: String -> Int -> (ExprAST, Int)
+parsePrototype s i =
+    case (fst curTok) of
+        TokIDENTIFIER fname -> case (snd argNames) of
+                                    (-1) -> (Error "Expected '(' in prototype", snd argNames)
+                                    (-2) -> (Error "Expected ')' in prototype", snd argNames)
+                                    _ -> (PrototypeAST fname (fst argNames), snd argNames)
+        _ -> (Error "Expexted function name in prototype", snd argNames)
+    where
+        curTok = getTok s i
+        argNames = parseArgNames s (snd curTok)
+
+parseArgNames :: String -> Int -> ([String], Int)
+parseArgNames s i =
+    if (s !! i) /= '('
+        then ([], -1)
+        else getArgNames [] s (i + 1)
+    where
+        getArgNames :: [String] -> String -> Int -> ([String], Int)
+        getArgNames xs s i =
+            case (fst curTok) of
+                TokIDENTIFIER argname -> (xs ++ (fst nextArgs), snd nextArgs)
+                TokChar ')'           -> (xs, snd curTok)
+                _                     -> ([], -2)
+            where
+                curTok = getTok s i
+                nextArgs = getArgNames xs s (snd curTok)
+
+-- definition ::= 'def' prototype expression
+parseDefinition :: String -> Int -> (ExprAST, Int)
+parseDefinition s i = 
+    let proto = parsePrototype s i in
+        case (fst proto) of
+            Error msg -> (Error msg, snd proto)
+            _ -> let e = parseExpression s (snd proto) in
+                    case (fst e) of
+                        NullAST -> e
+                        Error _ -> e
+                        _ -> (FunctionAST (fst proto) (fst e), (snd e))
+    where
+        curTok = getTok s i
+
+-- external ::= `extern` prototype
+parseExtern :: String -> Int -> (ExprAST, Int)
+parseExtern s i = 
+    parsePrototype s (snd curTok)
+    where
+        curTok = getTok s i -- eat `extern`
+
+-- topLevelexpr ::= expression
+parseTopLevelExpr :: String -> Int -> (ExprAST, Int)
+parseTopLevelExpr s i = 
+    case (fst e) of
+        NullAST -> e
+        Error msg -> e
+        _ -> (FunctionAST (PrototypeAST "" []) (fst e), snd e)
+    where
+        e = parseExpression s i
