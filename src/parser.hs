@@ -21,10 +21,10 @@ parseTop :: String -> Int -> [ExprAST] -> [ExprAST]
 parseTop s i es =
     case (fst tokAndpos) of
         TokEOF        -> es
-        (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
-        TokDEF        -> es ++ (handleDefinition s (snd tokAndpos))
-        TokEXTERN     -> es ++ (handleExtern s (snd tokAndpos))
-        _             -> es ++ (handleTopLevelExpression s (snd tokAndpos))
+        (TokChar ';') -> es ++ (parseTop s i es)
+        TokDEF        -> es ++ (handleDefinition s i)
+        TokEXTERN     -> es ++ (handleExtern s i)
+        _             -> es ++ (handleTopLevelExpression s i)
     where
         tokAndpos = getTok s i
 
@@ -132,14 +132,14 @@ parsePrototype s i =
                                     _ -> (PrototypeAST fname (fst argNames), snd argNames)
         _ -> (Error "Expexted function name in prototype", snd argNames)
     where
-        curTok = getTok s i
-        argNames = parseArgNames s (snd curTok)
+        curTok = getTok s i -- fname
+        argNames = parseArgNames s (snd curTok) -- `(` *argument `)`
 
 parseArgNames :: String -> Int -> ([String], Int)
 parseArgNames s i =
     if (s !! i) /= '('
         then ([], -1)
-        else getArgNames [] s (i + 1)
+        else getArgNames [] s (i + 1) -- *arguments `)`
     where
         getArgNames :: [String] -> String -> Int -> ([String], Int)
         getArgNames xs s i =
@@ -163,7 +163,7 @@ parseDefinition s i =
                         Error _ -> e
                         _ -> (FunctionAST (fst proto) (fst e), (snd e))
     where
-        curTok = getTok s i
+        curTok = getTok s i -- eat `def`
 
 -- external ::= `extern` prototype
 parseExtern :: String -> Int -> (ExprAST, Int)

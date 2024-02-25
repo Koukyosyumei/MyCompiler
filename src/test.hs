@@ -22,3 +22,7 @@ main = do
         resultDigit2 = getDigit digit 15
     check "test2-1" (fst resultDigit1) (TokNUMBER 123.456)  
     check "test2-2" (fst resultDigit2) (TokNUMBER 0.123)
+
+    let source = "def foo(x y) x+foo(y, 4.0);"
+        exprs = parseTop source 0 []
+    putStrLn $ show exprs
