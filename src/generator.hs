@@ -2,7 +2,7 @@ module Generator where
 
 import Parser
 
-data Code = LCODE String | ERROR String
+data Code = LCODE String | ERROR String deriving(Eq, Show)
 
 codeGen :: [(String, [String])] -> [(String, Float)] -> ExprAST -> Code
 
@@ -37,7 +37,10 @@ codeGen funcTable namedValue (PrototypeAST fname argNames) =
 codeGen funcTable namedValue (FunctionAST prototype body) =
     case prototypeCODE of
         LCODE p -> case bodyCODE of
-                    LCODE b -> LCODE (p ++ "{" ++ b ++ "}")
+                    LCODE b -> LCODE (p ++ " {\n"
+                                        ++ "entry:\n"
+                                        ++ "\t" ++ b 
+                                        ++ "}")
                     ERROR msg -> ERROR ("function body contains the following errors: " ++ msg)
         ERROR msg -> ERROR ("function declaration contains the following errors: " ++ msg)
     where
