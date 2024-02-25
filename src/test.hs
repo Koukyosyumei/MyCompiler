@@ -23,20 +23,20 @@ main = do
     check "test2-1" (fst resultDigit1) (TokNUMBER 123.456)  
     check "test2-2" (fst resultDigit2) (TokNUMBER 0.123)
 
-    let source = "def foo(x y) x+foo(y, 4.0);"
-        top = parseTop source 0 []
-        proto = parsePrototype source (snd (getTok source 0))
-        lhs = parsePrimary source 12
-        prim = getTok source 12
-        binOp = parseBinOpRHS 0 (fst lhs) source 14
-        rhs = parsePrimary source 15
-        rhsWord = getTok source 15
-        primary = parsePrimary source 15
-    putStrLn $ show top
-    putStrLn $ show proto
-    putStrLn $ show lhs
-    putStrLn $ show prim
-    putStrLn $ show binOp
-    putStrLn $ show rhs
-    putStrLn $ show rhsWord
-    putStrLn $ show primary
+    let source1 = "def foo(x y) x+foo(y, 4.0);"
+        top1 = parseTop source1 0 []
+    check "test3-1" top1 [FunctionAST (PrototypeAST "foo" ["x","y"]) 
+                                     (BinaryExprAST '+' (VariableExprAST "x") 
+                                                        (CallExprAST "foo" [VariableExprAST "y",
+                                                                            NumberExprAST 4.0]))]
+    let source2 = "def foo(x y) x+y y;"
+        top2 = parseTop source2 0 []
+    putStrLn $ show top2
+
+    let source3 = "def foo(x y) x+y );"
+        top3 = parseTop source3 0 []
+    putStrLn $ show top3
+
+    let source4 = "extern sin(a);"
+        top4 = parseTop source4 0 []
+    putStrLn $ show top4
