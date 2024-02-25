@@ -23,7 +23,7 @@ getTok s i =
                 then getDigit s i
             else if (s !! i) == '#'
                 then getComment s i
-            else if (length s) >= i
+            else if (length s) < i
                 then (TokEOF, i)
             else
                 (TokChar (s !! i), i)
@@ -60,7 +60,7 @@ getDigitStr s i =
 
 getComment :: String -> Int -> (Token, Int)
 getComment s i =
-    if (snd nextCS) == i
+    if (snd nextCS) < i
             then (TokEOF, i)
             else getTok s (i + 1)
     where

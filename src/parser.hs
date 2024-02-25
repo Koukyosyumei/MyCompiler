@@ -144,7 +144,7 @@ parseArgNames s i =
         getArgNames :: [String] -> String -> Int -> ([String], Int)
         getArgNames xs s i =
             case (fst curTok) of
-                TokIDENTIFIER argname -> (xs ++ (fst nextArgs), snd nextArgs)
+                TokIDENTIFIER argname -> (xs ++ [argname] ++ (fst nextArgs), snd nextArgs)
                 TokChar ')'           -> (xs, snd curTok)
                 _                     -> ([], -2)
             where

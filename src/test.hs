@@ -26,3 +26,13 @@ main = do
     let source = "def foo(x y) x+foo(y, 4.0);"
         exprs = parseTop source 0 []
     putStrLn $ show exprs
+
+    let source = "(x y)"
+        arguments = (parseArgNames source 0)
+        tmp1 = getTok source 1
+        tmp2 = getTok source 2
+        tmp3 = getTok source 4
+    putStrLn $ show arguments
+    putStrLn $ show tmp1
+    putStrLn $ show tmp2
+    putStrLn $ show tmp3
