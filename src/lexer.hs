@@ -26,7 +26,7 @@ getTok s i =
             else if (length s) < i
                 then (TokEOF, i)
             else
-                (TokChar (s !! i), i)
+                (TokChar (s !! i), i + 1)
 
 getAlpha :: String -> Int -> (Token, Int)
 getAlpha s i =

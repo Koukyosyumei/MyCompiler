@@ -25,9 +25,5 @@ main = do
 
     let source = "def foo(x y) x+foo(y, 4.0);"
         top = parseTop source 0 []
-        proto = parsePrototype source 3
-        expr = parseExpression source 11
     putStrLn $ show top
-    putStrLn $ show proto
-    putStrLn $ show expr
 

@@ -71,7 +71,7 @@ parseCallExpr idName args s i =
                    NullAST -> (NullAST, snd newArg)
                    _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
     else
-        (Error "Expected ')' or ',' in argument list", i)
+        (Error ("Expected ')' or ',' in argument list, but recived " ++ show (fst curTok)), i)
      where
         curTok = getTok s i
 
@@ -122,7 +122,7 @@ parseExpression s i =
     let lhs = parsePrimary s i in
         if (fst lhs) == NullAST
             then lhs
-            else parseBinOpRHS 0 (fst lhs) s i
+            else parseBinOpRHS 0 (fst lhs) s (snd lhs)
 
 
 parsePrototype :: String -> Int -> (ExprAST, Int)
@@ -147,7 +147,7 @@ parseArgNames s i =
         getArgNames s i =
             case (fst curTok) of
                 TokIDENTIFIER argname -> ([argname] ++ (fst nextArgs), snd nextArgs)
-                TokChar ')'           -> ([], snd curTok)
+                TokChar ')'           -> ([], (snd curTok))
                 _                     -> ([], -2)
             where
                 curTok = getTok s i
