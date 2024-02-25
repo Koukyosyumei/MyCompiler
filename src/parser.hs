@@ -21,7 +21,7 @@ parseTop :: String -> Int -> [ExprAST] -> [ExprAST]
 parseTop s i es =
     case (fst tokAndpos) of
         TokEOF        -> es
-        (TokChar ';') -> es ++ (parseTop s i es)
+        (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
         TokDEF        -> es ++ (handleDefinition s i)
         TokEXTERN     -> es ++ (handleExtern s i)
         _             -> es ++ (handleTopLevelExpression s i)
