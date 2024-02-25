@@ -55,11 +55,12 @@ parseParentExpr s i =
 -- identifierexpr ::= identifier | identifier '(( expresion* ')'
 parseIdentifierExpr :: String -> String -> Int -> (ExprAST, Int)
 parseIdentifierExpr idName s i =
-    if (fst curTok == TokChar '(')
-        then parseCallExpr idName [] s (snd curTok)
+    if (fst nextTok == TokChar '(')
+        then parseCallExpr idName [] s (snd nextTok)
         else (VariableExprAST idName, snd curTok)
     where
-        curTok = getTok s i
+        curTok = getTok s i -- eat identifier
+        nextTok = getTok s (snd curTok)
 
 parseCallExpr :: String -> [ExprAST] -> String -> Int -> (ExprAST, Int)
 parseCallExpr idName args s i =
@@ -79,7 +80,7 @@ parseCallExpr idName args s i =
 parsePrimary :: String -> Int -> (ExprAST, Int)
 parsePrimary s i =
     case (fst curTok) of
-        TokIDENTIFIER name -> parseIdentifierExpr name s (snd curTok)
+        TokIDENTIFIER name -> parseIdentifierExpr name s i
         TokNUMBER val -> parseNumberExpr val (snd curTok)
         TokChar '(' -> parseParentExpr s (snd curTok)
         _ -> (Error ("unknown token when parsing a primary expression: " ++ show (fst curTok)), i)
@@ -114,7 +115,7 @@ parseBinOpRHS exprPrec lhs s i =
         binOp = (s !! i)
         rhs = parsePrimary s (i + 1)
         nextPrec = getTokPrecedence (s !! (snd rhs))
-        rhs' = parseBinOpRHS (tokPrec + 1) (fst rhs) s (snd rhs)
+        rhs' = parseBinOpRHS (tokPrec + 1) (fst rhs) s (i + 1)
 
 -- expression ::= primary binoprhs
 parseExpression :: String -> Int -> (ExprAST, Int)
