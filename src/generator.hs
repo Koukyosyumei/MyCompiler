@@ -6,7 +6,7 @@ data Code = LCODE String | ERROR String deriving(Eq, Show)
 
 codeGen :: [(String, [String])] -> [(String, Float)] -> ExprAST -> Code
 
-codeGen _ _ (NumberExprAST val) = LCODE ("float " ++ (show val))
+codeGen _ _ (NumberExprAST val) = LCODE ((show val))
 
 codeGen _ namedValue (VariableExprAST name) = 
     case (lookup name namedValue) of
@@ -32,7 +32,9 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
         Nothing -> ERROR "Unknown functino referenced"    
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) = 
-    LCODE ("declare float " ++ ("@" ++ fname) ++ ("(" ++ (joinWithCommaStr argNames) ++ ")"))
+    LCODE ("declare float " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")"))
+    where
+        fname' = if fname == "" then "0" else fname
 
 codeGen funcTable namedValue (FunctionAST prototype body) =
     case prototypeCODE of
@@ -40,7 +42,7 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
                     LCODE b -> LCODE (p ++ " {\n"
                                         ++ "entry:\n"
                                         ++ "\t" ++ b 
-                                        ++ "}")
+                                        ++ "\n}\n")
                     ERROR msg -> ERROR ("function body contains the following errors: " ++ msg)
         ERROR msg -> ERROR ("function declaration contains the following errors: " ++ msg)
     where
