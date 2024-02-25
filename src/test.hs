@@ -1,5 +1,6 @@
 import Lexer
 import Parser
+import Generator
 
 check :: (Eq a, Show a) => String -> a -> a -> IO()
 check s c v = do
@@ -34,7 +35,11 @@ main = do
         top2 = parseTop source2 0 []
     check "test3-2" top2 [PrototypeAST "sin" ["a"]]
 
-    let source3 = "def foo(x y) x+y );"
+    let source3 = "4+5;"
         top3 = parseTop source3 0 []
     putStrLn $ show top3
+
+    let esource3 = "def foo(x y) x+y );"
+        etop3 = parseTop esource3 0 []
+    putStrLn $ show etop3
 
