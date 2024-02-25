@@ -55,23 +55,25 @@ parseParentExpr s i =
 -- identifierexpr ::= identifier | identifier '(( expresion* ')'
 parseIdentifierExpr :: String -> String -> Int -> (ExprAST, Int)
 parseIdentifierExpr idName s i =
-    if ((s !! (snd nextTok)) /= '(')
-        then (VariableExprAST idName, snd nextTok)
-        else parseCallExpr idName [] s (snd nextTok)
+    if (fst curTok == TokChar '(')
+        then parseCallExpr idName [] s (snd curTok)
+        else (VariableExprAST idName, snd curTok)
     where
-        nextTok = getTok s i
+        curTok = getTok s i
 
 parseCallExpr :: String -> [ExprAST] -> String -> Int -> (ExprAST, Int)
 parseCallExpr idName args s i =
-    if (s !! i) == ')'
-        then (CallExprAST idName args, i + 1)
-    else if (s !! i) == ','
-        then let newArg = parseExpression s (i + 1) in
+    if (fst curTok == TokChar ')')
+        then (CallExprAST idName args, snd curTok)
+    else if (fst curTok == TokChar ',')
+        then let newArg = parseExpression s (snd curTok) in
                case fst newArg of
                    NullAST -> (NullAST, snd newArg)
-                   _ -> parseCallExpr idName (args ++ [fst newArg]) s (i + 1)
+                   _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
     else
-        (Error "Call Error", i)
+        (Error "Expected ')' or ',' in argument list", i)
+     where
+        curTok = getTok s i
 
 -- primary ::= identifierexpr | numberexpr | parenexpr
 parsePrimary :: String -> Int -> (ExprAST, Int)
@@ -80,7 +82,7 @@ parsePrimary s i =
         TokIDENTIFIER name -> parseIdentifierExpr name s (snd curTok)
         TokNUMBER val -> parseNumberExpr val (snd curTok)
         TokChar '(' -> parseParentExpr s (snd curTok)
-        _ -> (Error "unknown token when expecting an expression", i)
+        _ -> (Error ("unknown token when parsing a primary expression: " ++ show (fst curTok)), i)
     where
         curTok = getTok s i
 
@@ -154,7 +156,7 @@ parseArgNames s i =
 -- definition ::= 'def' prototype expression
 parseDefinition :: String -> Int -> (ExprAST, Int)
 parseDefinition s i = 
-    let proto = parsePrototype s i in
+    let proto = parsePrototype s (snd curTok) in
         case (fst proto) of
             Error msg -> (Error msg, snd proto)
             _ -> let e = parseExpression s (snd proto) in

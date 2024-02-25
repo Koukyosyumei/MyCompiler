@@ -23,22 +23,11 @@ main = do
     check "test2-1" (fst resultDigit1) (TokNUMBER 123.456)  
     check "test2-2" (fst resultDigit2) (TokNUMBER 0.123)
 
-    let source = "def foo(x y)"
-        exprs = parseTop source 0 []
-        tmp1 = getTok source 0
-        tmp2 = getTok source 3
-        tmp3 = parseArgNames source 7
-    putStrLn $ show exprs
-    putStrLn $ show tmp1
-    putStrLn $ show tmp2
-    putStrLn $ show tmp3
+    let source = "def foo(x y) x+foo(y, 4.0);"
+        top = parseTop source 0 []
+        proto = parsePrototype source 3
+        expr = parseExpression source 11
+    putStrLn $ show top
+    putStrLn $ show proto
+    putStrLn $ show expr
 
-    let source = "(x y)"
-        arguments = (parseArgNames source 0)
-        tmp1 = getTok source 1
-        tmp2 = getTok source 2
-        tmp3 = getTok source 4
-    putStrLn $ show arguments
-    putStrLn $ show tmp1
-    putStrLn $ show tmp2
-    putStrLn $ show tmp3
