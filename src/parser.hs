@@ -66,14 +66,18 @@ parseCallExpr idName args s i =
     if (fst curTok == TokChar ')')
         then (CallExprAST idName args, snd curTok)
     else if (fst curTok == TokChar ',')
-        then let newArg = parseExpression s (snd curTok) in
-               case fst newArg of
-                   NullAST -> (NullAST, snd newArg)
-                   _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
+        then parseCallExpr idName args s (snd curTok)
     else
-        (Error ("Expected ')' or ',' in argument list, but recived " ++ show (fst curTok)), i)
+        case fst newArg of
+            NullAST -> (NullAST, snd newArg)
+            Error e -> newArg
+            _ -> if (nextWord == TokChar ')' || nextWord == TokChar ',')
+                    then parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
+                    else (Error "Expected ')' or ',' in argument list", snd curTok)    
      where
         curTok = getTok s i
+        newArg = parseExpression s (snd curTok)
+        nextWord = fst (getTok s (snd newArg))
 
 -- primary ::= identifierexpr | numberexpr | parenexpr
 parsePrimary :: String -> Int -> (ExprAST, Int)
@@ -111,8 +115,8 @@ parseBinOpRHS exprPrec lhs s i =
             else (BinaryExprAST binOp lhs (fst rhs), snd rhs)
     where
         tokPrec = getTokPrecedence (s !! i)
-        binOp = (s !! (i + 1))
-        rhs = parsePrimary s (i + 2)
+        binOp = (s !! i)
+        rhs = parsePrimary s (i + 1)
         nextPrec = getTokPrecedence (s !! (snd rhs))
         rhs' = parseBinOpRHS (tokPrec + 1) (fst rhs) s (snd rhs)
 
