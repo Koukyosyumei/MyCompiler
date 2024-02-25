@@ -29,14 +29,12 @@ main = do
                                      (BinaryExprAST '+' (VariableExprAST "x") 
                                                         (CallExprAST "foo" [VariableExprAST "y",
                                                                             NumberExprAST 4.0]))]
-    let source2 = "def foo(x y) x+y y;"
+
+    let source2 = "extern sin(a);"
         top2 = parseTop source2 0 []
-    putStrLn $ show top2
+    check "test3-2" top2 [PrototypeAST "sin" ["a"]]
 
     let source3 = "def foo(x y) x+y );"
         top3 = parseTop source3 0 []
     putStrLn $ show top3
 
-    let source4 = "extern sin(a);"
-        top4 = parseTop source4 0 []
-    putStrLn $ show top4
