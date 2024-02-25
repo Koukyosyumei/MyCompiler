@@ -25,5 +25,12 @@ main = do
 
     let source = "def foo(x y) x+foo(y, 4.0);"
         top = parseTop source 0 []
+        primary = parsePrimary source 12
+        primary' = getTok source 12
+        tmp1 = getTok "x+;" 1 
+        -- binOpRHS = 
     putStrLn $ show top
+    putStrLn $ show primary
+    putStrLn $ show primary'
+    putStrLn $ show tmp1
 
