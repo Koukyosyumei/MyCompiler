@@ -44,13 +44,13 @@ main = do
         code3 = codeGen [] [] (top3 !! 0)
     check "test3-3" top3 [FunctionAST (PrototypeAST "" [])
                                     (BinaryExprAST '+' (NumberExprAST 4.0) (NumberExprAST 5.0))]
-    putStr (code2str code3)
+    putStr (code2str (_getCode code3))
 
     let source4 = "def foo(a) a*a;"
         top4 = parseTop source4 0 []
         code4 = codeGen [] [] (top4 !! 0)
     putStrLn $ show top4
-    putStr (code2str code4)
+    putStr (code2str (_getCode code4))
 
     -- let esource3 = "def foo(x y) x+y );"
     --    etop3 = parseTop esource3 0 []
