@@ -46,11 +46,21 @@ main = do
                                     (BinaryExprAST '+' (NumberExprAST 4.0) (NumberExprAST 5.0))]
     putStr (code2str (_getCode code3))
 
-    let source4 = "def foo(a) a*a;"
+    let source4 = "def foo(a b) a*a + b*b;"
         top4 = parseTop source4 0 []
         code4 = codeGen [] [] (top4 !! 0)
+        tmp1 = getTok source4 0
+        proto = parsePrototype source4 3
+        tmp2 = parseExpression source4 12
+        tmp3 = parsePrimary source4 12
+        tmp4 = parseBinOpRHS 0 (fst tmp3) source4 (snd tmp3)
     putStrLn $ show top4
     putStr (code2str (_getCode code4))
+    putStrLn $ show tmp1
+    putStrLn $ show proto
+    putStrLn $ show tmp2
+    putStrLn $ show tmp3
+    putStrLn $ show tmp4
 
     -- let esource3 = "def foo(x y) x+y );"
     --    etop3 = parseTop esource3 0 []

@@ -100,7 +100,9 @@ isError _         = False
 -- binoprhs ::= (+ primary)*
 parseBinOpRHS :: Int -> ExprAST -> String -> Int -> (ExprAST, Int)
 parseBinOpRHS exprPrec lhs s i =
-    if tokPrec < exprPrec
+    if (length s) >= i
+    then (lhs, i)
+    else if tokPrec < exprPrec
         then (lhs, i)
         else
         if isError (fst rhs)
@@ -108,14 +110,14 @@ parseBinOpRHS exprPrec lhs s i =
             else if tokPrec < nextPrec
                 then if isError (fst rhs')
                         then rhs'
-                        else (BinaryExprAST binOp lhs (fst rhs'), snd rhs)
-            else (BinaryExprAST binOp lhs (fst rhs), snd rhs)
+                        else parseBinOpRHS exprPrec (BinaryExprAST binOp lhs (fst rhs')) s (snd rhs')
+            else parseBinOpRHS exprPrec (BinaryExprAST binOp lhs (fst rhs)) s (snd rhs)
     where
         tokPrec = getTokPrecedence (s !! i)
         binOp = (s !! i)
         rhs = parsePrimary s (i + 1)
         nextPrec = getTokPrecedence (s !! (snd rhs))
-        rhs' = parseBinOpRHS (tokPrec + 1) (fst rhs) s (i + 1)
+        rhs' = parseBinOpRHS (tokPrec + 1) (fst rhs) s (snd rhs)
 
 -- expression ::= primary binoprhs
 parseExpression :: String -> Int -> (ExprAST, Int)
