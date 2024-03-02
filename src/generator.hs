@@ -19,7 +19,7 @@ _getVEnv (a, b, c) = c
 
 addVarName :: [String] -> VEnv -> VEnv
 addVarName [] venv = venv
-addVarName (x:xs) venv = venv ++ [(x, SYM x)]
+addVarName (x:xs) venv = addVarName xs (venv ++ [(x, SYM x)])
 
 codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
 
@@ -29,7 +29,7 @@ codeGen fenv namedValue (VariableExprAST name) =
     case (lookup name namedValue) of
         Just (ACT val) -> (LCODE ("float " ++ (show val)), fenv, namedValue)
         Just (SYM sym) -> (LCODE sym, fenv, namedValue)
-        Nothing        -> (ERROR "Unknown variable name", fenv, namedValue)
+        Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, namedValue)
 
 codeGen funcTable namedValue (BinaryExprAST op lhs rhs) =
     case op of
