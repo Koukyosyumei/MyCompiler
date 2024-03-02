@@ -46,7 +46,7 @@ main = do
                                     (BinaryExprAST '+' (NumberExprAST 4.0) (NumberExprAST 5.0))]
     putStr (code2str (_getCode code3))
 
-    let source4 = "def foo(a b) a*a + b*b;"
+    let source4 = "def foo(a b) a*a+b*b;"
         top4 = parseTop source4 0 []
         code4 = codeGen [] [] (top4 !! 0)
         tmp1 = getTok source4 0
