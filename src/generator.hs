@@ -19,7 +19,11 @@ _getVEnv (a, b, c) = c
 
 addVarName :: [String] -> VEnv -> VEnv
 addVarName [] venv = venv
-addVarName (x:xs) venv = addVarName xs (venv ++ [(x, SYM x)])
+addVarName (x:xs) venv = addVarName xs (venv ++ [(x, SYM ("%" ++ x))])
+
+isBinaryExpr :: ExprAST -> Bool
+isBinaryExpr (BinaryExprAST _ _ _) = True
+isBinaryExpr _ = False
 
 codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
 
@@ -31,21 +35,7 @@ codeGen fenv namedValue (VariableExprAST name) =
         Just (SYM sym) -> (LCODE sym, fenv, namedValue)
         Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, namedValue)
 
-codeGen funcTable namedValue (BinaryExprAST op lhs rhs) =
-    case op of
-        '+' -> (fADD (_getCode lcode) (_getCode rcode) newVar, funcTable, namedValue ++ [(newVar, SYM newVar)])
-        '-' -> (fSUB (_getCode lcode) (_getCode rcode) newVar, funcTable, namedValue ++ [(newVar, SYM newVar)])
-        '*' -> (fMUL (_getCode lcode) (_getCode rcode) newVar, funcTable, namedValue ++ [(newVar, SYM newVar)])
-        '<' -> (fCmpULT (_getCode lcode) (_getCode rcode) newVar, funcTable, namedValue)
-        _ -> (ERROR "invalid binary operator", funcTable, namedValue)
-    where
-        lcode = codeGen funcTable namedValue lhs
-        rcode = codeGen funcTable namedValue rhs
-        newVar = case op of
-                        '+' -> generateNewVarName "%addtmp" namedValue
-                        '-' -> generateNewVarName "%subtmp" namedValue
-                        '*' -> generateNewVarName "%multmp" namedValue
-                        '<' -> generateNewVarName "%cmptmp" namedValue
+codeGen funcTable namedValue (BinaryExprAST op lhs rhs) = fst (codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs))
 
 codeGen funcTable namedValue (CallExprAST fname argExprs) =
     case (lookup fname funcTable) of
@@ -108,6 +98,38 @@ fCmpULT _ (ERROR msg) _ = ERROR msg
 
 createCall :: String -> [Code] -> String -> Code
 createCall fname args result = LCODE (result ++ " = call float @" ++ fname ++ "(" ++ (joinWithComma args) ++ ")")
+
+codeAppend :: Code -> Code -> Code
+codeAppend (LCODE a) (LCODE b) = LCODE (a ++ b)
+
+
+codeGenBinaryExpr:: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
+codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
+    case op of
+        '+' -> ((codeAppend intermediateCode (fADD lterm rterm newVar), funcTable, namedValue'' ++ [(newVar, SYM newVar)]), newVar)
+        '-' -> ((codeAppend intermediateCode (fSUB lterm rterm newVar), funcTable, namedValue'' ++ [(newVar, SYM newVar)]), newVar)
+        '*' -> ((codeAppend intermediateCode (fMUL lterm rterm newVar), funcTable, namedValue'' ++ [(newVar, SYM newVar)]), newVar)
+        '<' -> ((codeAppend intermediateCode (fCmpULT lterm rterm newVar), funcTable, namedValue), newVar)
+        _ -> ((ERROR "invalid binary operator", funcTable, namedValue), newVar)
+    where
+        lbranch = codeGenBinaryExpr funcTable namedValue lhs
+        intermediateCodeL = if isBinaryExpr lhs then codeAppend (_getCode (fst lbranch)) (LCODE "\n\t") else LCODE ("")
+        lterm = if isBinaryExpr lhs then LCODE (snd lbranch) else _getCode (fst lbranch)
+        namedValue' = if isBinaryExpr lhs then  namedValue ++ [(snd lbranch, SYM (snd lbranch))] else namedValue
+        
+        rbranch = codeGenBinaryExpr funcTable namedValue' rhs
+        intermediateCodeR = if isBinaryExpr rhs then codeAppend (_getCode (fst rbranch)) (LCODE "\n\t") else LCODE ("")
+        rterm = if isBinaryExpr rhs then LCODE (snd rbranch) else _getCode (fst rbranch)
+        namedValue'' = if isBinaryExpr rhs then  namedValue' ++ [(snd rbranch, SYM (snd rbranch))] else namedValue'
+
+        newVar = case op of
+                        '+' -> generateNewVarName "%addtmp" namedValue''
+                        '-' -> generateNewVarName "%subtmp" namedValue''
+                        '*' -> generateNewVarName "%multmp" namedValue''
+                        '<' -> generateNewVarName "%cmptmp" namedValue''
+        intermediateCode = codeAppend intermediateCodeL intermediateCodeR
+
+codeGenBinaryExpr funcTable namedValue exp = (codeGen funcTable namedValue exp, "")
 
 joinWithComma :: [Code] -> String
 joinWithComma []             = ""
