@@ -72,7 +72,7 @@ parseCallExpr idName args s i =
     else
         case fst newArg of
             Error e -> (Error e, snd newArg)
-            _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
+            _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd newArg)
      where
         curTok = getTok s i
         newArg = parseExpression s i
@@ -186,9 +186,9 @@ parseIfExpr s i =
     case (fst condExpr) of
         Error msg -> (Error ("cond contains the following error: " ++ msg), snd condExpr)
         _ -> if fst curThen /= TokTHEN
-                then (Error "expected then", snd curThen)
+                then (Error ("expected then, got " ++ show curThen), snd curThen)
                 else if fst curElse /= TokELSE
-                        then (Error "expected else", snd curElse)
+                        then (Error ("expected else " ++ show curElse), snd curElse)
                         else (IfExprAST (fst condExpr) (fst thenExpr) (fst elseExpr), snd elseExpr)
     where
         curIf = getTok s i -- eat `if`

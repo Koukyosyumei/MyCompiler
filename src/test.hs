@@ -52,6 +52,10 @@ main = do
     check "test3-4" top4 [FunctionAST (PrototypeAST "foo" ["a","b"]) (BinaryExprAST '+' (BinaryExprAST '+' (BinaryExprAST '*' (VariableExprAST "a") (VariableExprAST "a")) (BinaryExprAST '*' (BinaryExprAST '*' (NumberExprAST 2.0) (VariableExprAST "a")) (VariableExprAST "b"))) (BinaryExprAST '*' (VariableExprAST "b") (VariableExprAST "b")))]
     putStr (code2str (_getCode code4))
 
+    let source5 = "def fib(x) if x<3 then 1 else fib(x-1)+fib(x-2);"
+        top5 = parseTop source5 0 []
+    putStr (show top5)
+
     -- let esource3 = "def foo(x y) x+y );"
     --    etop3 = parseTop esource3 0 []
     -- putStrLn $ show etop3
