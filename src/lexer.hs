@@ -7,6 +7,9 @@ data Token = TokEOF
     | TokIDENTIFIER String
     | TokNUMBER Float
     | TokChar Char 
+    | TokIF
+    | TokTHEN
+    | TokELSE
     deriving (Eq, Show)
 
 -- | getTok - Return the next token from standard input
@@ -33,6 +36,9 @@ getAlpha s i =
     case (fst alphaStr) of
         "def"      -> (TokDEF, snd alphaStr)
         "extern"   -> (TokEXTERN, snd alphaStr)
+        "if"       -> (TokIF, snd alphaStr)
+        "then"     -> (TokTHEN, snd alphaStr)
+        "else"     -> (TokELSE, snd alphaStr)
         identifier -> (TokIDENTIFIER identifier, snd alphaStr)
     where
         alphaStr = getAlphaStr s i

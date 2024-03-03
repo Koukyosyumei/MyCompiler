@@ -9,6 +9,7 @@ data ExprAST = NumberExprAST Float
     | CallExprAST String [ExprAST]
     | PrototypeAST String [String]
     | FunctionAST ExprAST ExprAST  -- the first ExprAST should be PrototypeAST
+    | IfExprAST ExprAST ExprAST ExprAST
     | NullAST
     | Error String
     deriving (Eq, Show)
@@ -68,7 +69,7 @@ parseCallExpr idName args s i =
         then (CallExprAST idName args, snd curTok)
     else if (fst curTok == TokChar ',')
         then parseCallExpr idName args s (snd curTok)
-    else 
+    else
         case fst newArg of
             Error e -> (Error e, snd newArg)
             _ -> parseCallExpr idName (args ++ [fst newArg]) s (snd curTok)
@@ -83,6 +84,7 @@ parsePrimary s i =
         TokIDENTIFIER name -> parseIdentifierExpr name s i
         TokNUMBER val -> parseNumberExpr val (snd curTok)
         TokChar '(' -> parseParentExpr s (snd curTok)
+        TokIF -> parseIfExpr s i
         _ -> (Error ("unknown token when parsing a primary expression: " ++ show (fst curTok)), i)
     where
         curTok = getTok s i
@@ -159,7 +161,7 @@ parseArgNames s i =
 
 -- definition ::= 'def' prototype expression
 parseDefinition :: String -> Int -> (ExprAST, Int)
-parseDefinition s i = 
+parseDefinition s i =
     let proto = parsePrototype s (snd curTok) in
         case (fst proto) of
             Error msg -> (Error msg, snd proto)
@@ -167,23 +169,41 @@ parseDefinition s i =
                     case (fst e) of
                         NullAST -> e
                         Error _ -> e
-                        _ -> (FunctionAST (fst proto) (fst e), (snd e))
+                        _       -> (FunctionAST (fst proto) (fst e), (snd e))
     where
         curTok = getTok s i -- eat `def`
 
 -- external ::= `extern` prototype
 parseExtern :: String -> Int -> (ExprAST, Int)
-parseExtern s i = 
+parseExtern s i =
     parsePrototype s (snd curTok)
     where
         curTok = getTok s i -- eat `extern`
 
+-- ifexpr ::= 'if' expression 'then' expression 'else' expression
+parseIfExpr :: String -> Int -> (ExprAST, Int)
+parseIfExpr s i =
+    case (fst condExpr) of
+        Error msg -> (Error ("cond contains the following error: " ++ msg), snd condExpr)
+        _ -> if fst curThen /= TokTHEN
+                then (Error "expected then", snd curThen)
+                else if fst curElse /= TokELSE
+                        then (Error "expected else", snd curElse)
+                        else (IfExprAST (fst condExpr) (fst thenExpr) (fst elseExpr), snd elseExpr)
+    where
+        curIf = getTok s i -- eat `if`
+        condExpr = parseExpression s (snd curIf)
+        curThen = getTok s (snd condExpr)
+        thenExpr = parseExpression s (snd curThen)
+        curElse = getTok s (snd thenExpr)
+        elseExpr = parseExpression s (snd curElse)
+
 -- topLevelexpr ::= expression
 parseTopLevelExpr :: String -> Int -> (ExprAST, Int)
-parseTopLevelExpr s i = 
+parseTopLevelExpr s i =
     case (fst e) of
-        NullAST -> e
+        NullAST   -> e
         Error msg -> e
-        _ -> (FunctionAST (PrototypeAST "" []) (fst e), snd e)
+        _         -> (FunctionAST (PrototypeAST "" []) (fst e), snd e)
     where
         e = parseExpression s i
