@@ -77,6 +77,31 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
         bodyCODE = codeGen newfuncTable (namedValue ++ (_getVEnv prototypeCODE)) body
         localVars = _getVEnv bodyCODE
 
+codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable, namedValue)
+    where
+        condCode = codeGen funcTable namedValue condAST
+        condRes  = LCODE ("\n\t%ifcond = " ++ fst (last (_getVEnv condCode)))
+        branchCode = LCODE ("\n\tbr i1 %ifcond, label %then, label %else\n")
+        entryCode = codeAppend (codeAppend (_getCode condCode) condRes) branchCode
+
+        thenBranch = codeGen (_getFEnv condCode) (_getVEnv condCode) thenAST
+        thenRes = case thenAST of
+                     NumberExprAST x -> LCODE ("%thentmp = " ++ (show x))
+                     _ -> codeAppend (_getCode thenBranch) (LCODE ("\n\t%thentmp = " ++ fst (last (_getVEnv thenBranch))))
+        thenCode = codeAppend (codeAppend (LCODE ("\nthen:\n\t")) thenRes)
+                              (LCODE ("\n\tbr label %ifcont\n"))
+
+        elseBranch = codeGen (_getFEnv thenBranch) (_getVEnv thenBranch) elseAST
+        elseRes = case elseAST of
+                     NumberExprAST x -> LCODE ("%elsetmp = " ++ (show x))
+                     _ -> codeAppend (_getCode elseBranch) (LCODE ("\n\t%elsetmp = " ++ fst (last (_getVEnv elseBranch))))
+        elseCode = codeAppend (codeAppend (LCODE ("\nelse:\n\t")) elseRes)
+                              (LCODE ("\n\tbr label %ifcont\n"))
+
+        contCode = LCODE ("\nifcont:\n\t%iftmp = phi double [ %calltmp, %then ], [ %calltmp1, %else ]")
+
+        code = codeAppend (codeAppend (codeAppend entryCode thenCode) elseCode) contCode
+
 codeGen funcTable namedValue ast = (errormsg, funcTable, namedValue)
     where
         errormsg = ERROR ("Unexpected inputs for codeGen:\n" ++ "\tfuncTable = " ++ (show funcTable) ++ "\n\tnamedValue = " ++ (show namedValue) ++ "\n\tast = " ++ (show ast) ++ "\n")
@@ -123,7 +148,7 @@ codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
         '+' -> ((codeAppend intermediateCode (fADD lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
         '-' -> ((codeAppend intermediateCode (fSUB lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
         '*' -> ((codeAppend intermediateCode (fMUL lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
-        '<' -> ((codeAppend intermediateCode (fCmpULT lterm rterm newVar), funcTable, namedValueLR), newVar)
+        '<' -> ((codeAppend intermediateCode (fCmpULT lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
         _ -> ((ERROR "invalid binary operator", funcTable, namedValueLR), newVar)
     where
         lbranch = codeGenBinaryExpr funcTable namedValue lhs
