@@ -77,7 +77,7 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
         bodyCODE = codeGen newfuncTable (namedValue ++ (_getVEnv prototypeCODE)) body
         localVars = _getVEnv bodyCODE
 
-codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable, namedValue)
+codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable, (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
     where
         condCode = codeGen funcTable namedValue condAST
         condRes  = LCODE ("\n\t%ifcond = " ++ fst (last (_getVEnv condCode)))
@@ -85,20 +85,27 @@ codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTa
         entryCode = codeAppend (codeAppend (_getCode condCode) condRes) branchCode
 
         thenBranch = codeGen (_getFEnv condCode) (_getVEnv condCode) thenAST
-        thenRes = case thenAST of
-                     NumberExprAST x -> LCODE ("%thentmp = " ++ (show x))
-                     _ -> codeAppend (_getCode thenBranch) (LCODE ("\n\t%thentmp = " ++ fst (last (_getVEnv thenBranch))))
-        thenCode = codeAppend (codeAppend (LCODE ("\nthen:\n\t")) thenRes)
+        thenBody = case thenAST of
+                     NumberExprAST x -> LCODE ("")
+                     _ -> codeAppend (LCODE "\n\t") (_getCode thenBranch)
+        thenRes = case thenAST of 
+                     NumberExprAST x -> LCODE (show x)
+                     _ -> LCODE (fst (last (_getVEnv thenBranch)))
+        thenCode = codeAppend (codeAppend (LCODE ("\nthen:")) thenBody)
                               (LCODE ("\n\tbr label %ifcont\n"))
 
         elseBranch = codeGen (_getFEnv thenBranch) (_getVEnv thenBranch) elseAST
+        elseBody = case elseAST of
+                     NumberExprAST x -> LCODE ("")
+                     _ -> codeAppend (LCODE "\n\t") (_getCode elseBranch)
         elseRes = case elseAST of
-                     NumberExprAST x -> LCODE ("%elsetmp = " ++ (show x))
-                     _ -> codeAppend (_getCode elseBranch) (LCODE ("\n\t%elsetmp = " ++ fst (last (_getVEnv elseBranch))))
-        elseCode = codeAppend (codeAppend (LCODE ("\nelse:\n\t")) elseRes)
+                     NumberExprAST x -> LCODE (show x)
+                     _ -> LCODE (fst (last (_getVEnv elseBranch)))
+        elseCode = codeAppend (codeAppend (LCODE ("\nelse:")) elseBody)
                               (LCODE ("\n\tbr label %ifcont\n"))
 
-        contCode = LCODE ("\nifcont:\n\t%iftmp = phi double [ %calltmp, %then ], [ %calltmp1, %else ]")
+        contCode = codeAppend (codeAppend (LCODE ("\nifcont:\n\t%iftmp = phi double [ ")) thenRes)
+                              (codeAppend (LCODE (", %then ], [ ")) (codeAppend elseRes (LCODE (", %else ]"))))
 
         code = codeAppend (codeAppend (codeAppend entryCode thenCode) elseCode) contCode
 
