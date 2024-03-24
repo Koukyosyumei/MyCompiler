@@ -49,7 +49,7 @@ main = do
     let source4 = "def foo(a b) a*a+2*a*b+b*b;"
         top4 = parseTop source4 0 []
         code4 = codeGen [] [] (top4 !! 0)
-        top4' = parseTop "def bar(a b) foo(a, 4);" 0 []
+        top4' = parseTop "def bar(a b) foo(a, 4)+foo(2, b);" 0 []
         code4' = codeGen (_getFEnv code4) (_getVEnv code4) (top4' !! 0)
     check "test3-4" top4 [FunctionAST (PrototypeAST "foo" ["a","b"]) (BinaryExprAST '+' (BinaryExprAST '+' (BinaryExprAST '*' (VariableExprAST "a") (VariableExprAST "a")) (BinaryExprAST '*' (BinaryExprAST '*' (NumberExprAST 2.0) (VariableExprAST "a")) (VariableExprAST "b"))) (BinaryExprAST '*' (VariableExprAST "b") (VariableExprAST "b")))]
     putStr (code2str (_getCode code4))
