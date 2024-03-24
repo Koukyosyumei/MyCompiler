@@ -73,9 +73,13 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
         ERROR msg -> (ERROR ("function declaration contains the following errors: " ++ msg), funcTable, namedValue)
     where
         prototypeCODE = codeGen funcTable namedValue prototype
-        bodyCODE = codeGen funcTable (namedValue ++ (_getVEnv prototypeCODE)) body
         newfuncTable = _getFEnv prototypeCODE
+        bodyCODE = codeGen newfuncTable (namedValue ++ (_getVEnv prototypeCODE)) body
         localVars = _getVEnv bodyCODE
+
+codeGen funcTable namedValue ast = (errormsg, funcTable, namedValue)
+    where
+        errormsg = ERROR ("Unexpected inputs for codeGen:\n" ++ "\tfuncTable = " ++ (show funcTable) ++ "\n\tnamedValue = " ++ (show namedValue) ++ "\n\tast = " ++ (show ast) ++ "\n")
 
 generateNewVarName :: String -> VEnv -> String
 generateNewVarName w venv = generateNewVarName' w 0 venv
