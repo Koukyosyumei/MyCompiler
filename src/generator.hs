@@ -41,13 +41,15 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
     case (lookup fname funcTable) of
         Just argNames -> if (length argNames /= length argExprs)
                             then (ERROR "Incorrect # arguments passed", funcTable, namedValue)
-                            else (createCall fname (map (\arg -> _getCode (codeGen funcTable namedValue arg)) argExprs) "calltmp",
-                                 funcTable, namedValue)
+                            else (createCall fname (map (\arg -> _getCode (codeGen funcTable namedValue arg)) argExprs) resultVar,
+                                 funcTable, namedValue ++ [(resultVar, SYM resultVar)])
         Nothing -> (ERROR "Unknown functino referenced", funcTable, namedValue)
+    where
+        resultVar = generateNewVarName "%calltmp" namedValue
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) =
     (LCODE ("declare double " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
-     funcTable, 
+     funcTable ++ [(fname', argNames)], 
      addVarName argNames namedValue)
     where
         fname' = if fname == "" then "0" else fname
@@ -60,13 +62,14 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
                                         ++ "\t" ++ b
                                         ++ "\n\tret double " ++ (fst (localVars !! ((length localVars) - 1)))
                                         ++ "\n}\n"), 
-                                funcTable, 
+                                newfuncTable, 
                                 localVars)
                     ERROR msg -> (ERROR ("function body contains the following errors: " ++ msg), funcTable, namedValue)
         ERROR msg -> (ERROR ("function declaration contains the following errors: " ++ msg), funcTable, namedValue)
     where
         prototypeCODE = codeGen funcTable namedValue prototype
         bodyCODE = codeGen funcTable (namedValue ++ (_getVEnv prototypeCODE)) body
+        newfuncTable = _getFEnv prototypeCODE
         localVars = _getVEnv bodyCODE
 
 generateNewVarName :: String -> VEnv -> String

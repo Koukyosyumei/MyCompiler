@@ -49,12 +49,17 @@ main = do
     let source4 = "def foo(a b) a*a+2*a*b+b*b;"
         top4 = parseTop source4 0 []
         code4 = codeGen [] [] (top4 !! 0)
+        top4' = parseTop "def bar(a b) foo(a, 4);" 0 []
+        code4' = codeGen (_getFEnv code4) (_getVEnv code4) (top4' !! 0)
     check "test3-4" top4 [FunctionAST (PrototypeAST "foo" ["a","b"]) (BinaryExprAST '+' (BinaryExprAST '+' (BinaryExprAST '*' (VariableExprAST "a") (VariableExprAST "a")) (BinaryExprAST '*' (BinaryExprAST '*' (NumberExprAST 2.0) (VariableExprAST "a")) (VariableExprAST "b"))) (BinaryExprAST '*' (VariableExprAST "b") (VariableExprAST "b")))]
     putStr (code2str (_getCode code4))
+    -- putStr (show top4')
+    -- putStr (show (_getFEnv code4))
+    putStr (code2str (_getCode code4'))
 
     let source5 = "def fib(x) if x<3 then 1 else fib(x-1)+fib(x-2);"
         top5 = parseTop source5 0 []
-    putStr (show top5)
+    check "test3-5" top5 [FunctionAST (PrototypeAST "fib" ["x"]) (IfExprAST (BinaryExprAST '<' (VariableExprAST "x") (NumberExprAST 3.0)) (NumberExprAST 1.0) (BinaryExprAST '+' (CallExprAST "fib" [BinaryExprAST '-' (VariableExprAST "x") (NumberExprAST 1.0)]) (CallExprAST "fib" [BinaryExprAST '-' (VariableExprAST "x") (NumberExprAST 2.0)])))]
 
     -- let esource3 = "def foo(x y) x+y );"
     --    etop3 = parseTop esource3 0 []
