@@ -31,7 +31,7 @@ codeGen fenv venv (NumberExprAST val) = (LCODE (show val), fenv, venv)
 
 codeGen fenv namedValue (VariableExprAST name) =
     case (lookup name namedValue) of
-        Just (ACT val) -> (LCODE ("float " ++ (show val)), fenv, namedValue)
+        Just (ACT val) -> (LCODE ("double " ++ (show val)), fenv, namedValue)
         Just (SYM sym) -> (LCODE sym, fenv, namedValue)
         Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, namedValue)
 
@@ -46,7 +46,7 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
         Nothing -> (ERROR "Unknown functino referenced", funcTable, namedValue)
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) =
-    (LCODE ("declare float " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
+    (LCODE ("declare double " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
      funcTable, 
      addVarName argNames namedValue)
     where
@@ -58,7 +58,7 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
                     LCODE b -> (LCODE (p ++ " {\n"
                                         ++ "entry:\n"
                                         ++ "\t" ++ b
-                                        ++ "\n\tret " ++ (fst (localVars !! ((length localVars) - 1)))
+                                        ++ "\n\tret double " ++ (fst (localVars !! ((length localVars) - 1)))
                                         ++ "\n}\n"), 
                                 funcTable, 
                                 localVars)
@@ -79,27 +79,27 @@ generateNewVarName' w i venv =
         Nothing -> w ++ show i
 
 fADD :: Code -> Code -> String -> Code
-fADD (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fadd float " ++ op1 ++ ", " ++ op2)
+fADD (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fadd double " ++ op1 ++ ", " ++ op2)
 fADD (ERROR msg) _ _ = ERROR msg
 fADD _ (ERROR msg) _ = ERROR msg
 
 fSUB :: Code -> Code -> String -> Code
-fSUB (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fsub float " ++ op1 ++ ", " ++ op2)
+fSUB (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fsub double " ++ op1 ++ ", " ++ op2)
 fSUB (ERROR msg) _ _ = ERROR msg
 fSUB _ (ERROR msg) _ = ERROR msg
 
 fMUL :: Code -> Code -> String -> Code
-fMUL (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fmul float " ++ op1 ++ ", " ++ op2)
+fMUL (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fmul double " ++ op1 ++ ", " ++ op2)
 fMUL (ERROR msg) _ _ = ERROR msg
 fMUL _ (ERROR msg) _ = ERROR msg
 
 fCmpULT :: Code -> Code -> String -> Code
-fCmpULT (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fcmp ult float " ++ op1 ++ ", " ++ op2)
+fCmpULT (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fcmp ult double " ++ op1 ++ ", " ++ op2)
 fCmpULT (ERROR msg) _ _ = ERROR msg
 fCmpULT _ (ERROR msg) _ = ERROR msg
 
 createCall :: String -> [Code] -> String -> Code
-createCall fname args result = LCODE (result ++ " = call float @" ++ fname ++ "(" ++ (joinWithComma args) ++ ")")
+createCall fname args result = LCODE (result ++ " = call double @" ++ fname ++ "(" ++ (joinWithComma args) ++ ")")
 
 codeAppend :: Code -> Code -> Code
 codeAppend (LCODE a) (LCODE b) = LCODE (a ++ b)
