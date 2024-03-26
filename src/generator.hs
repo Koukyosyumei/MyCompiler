@@ -53,7 +53,7 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
         resultVar = generateNewVarName "%calltmp" namedValue
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) =
-    (LCODE ("declare double " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
+    (LCODE ("define double " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
      funcTable ++ [(fname', argNames)], 
      addVarName argNames namedValue)
     where
