@@ -61,8 +61,5 @@ main = do
         top5 = parseTop source5 0 []
         code5 = codeGen [] [] (top5 !! 0)
     check "test3-5" top5 [FunctionAST (PrototypeAST "fib" ["x"]) (IfExprAST (BinaryExprAST '<' (VariableExprAST "x") (NumberExprAST 3.0)) (NumberExprAST 1.0) (BinaryExprAST '+' (CallExprAST "fib" [BinaryExprAST '-' (VariableExprAST "x") (NumberExprAST 1.0)]) (CallExprAST "fib" [BinaryExprAST '-' (VariableExprAST "x") (NumberExprAST 2.0)])))]
-    putStr (code2str (_getCode code5))
-    -- let esource3 = "def foo(x y) x+y );"
-    --    etop3 = parseTop esource3 0 []
-    -- putStrLn $ show etop3
+    check "test3-6" (code2str (_getCode code5)) "declare double @fib(%x) {\nentry:\n\t%cmptmp0 = fcmp ult double %x, 3.0\n\t%ifcond = %cmptmp0\n\tbr i1 %ifcond, label %then, label %else\n\nthen:\n\tbr label %ifcont\n\nelse:\n\t%calltmp0 = call double @fib(double %subtmp0 = fsub double %x, 1.0)\n\t%calltmp1 = call double @fib(double %subtmp0 = fsub double %x, 2.0)\n\t%addtmp0 = fadd double %calltmp0, %calltmp1\n\tbr label %ifcont\n\nifcont:\n\t%iftmp = phi double [ 1.0, %then ], [ %addtmp0, %else ]\n\tret double %iftmp\n}\n"
 
