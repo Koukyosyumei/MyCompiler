@@ -30,6 +30,16 @@ isBinaryExpr :: ExprAST -> Bool
 isBinaryExpr (BinaryExprAST _ _ _) = True
 isBinaryExpr _ = False
 
+codeGens :: FEnv -> VEnv -> [ExprAST] -> (Code, FEnv, VEnv)
+codeGens fenv venv es = codeGens_ fenv venv es (LCODE "")
+
+codeGens_ :: FEnv -> VEnv -> [ExprAST] -> Code -> (Code, FEnv, VEnv)
+codeGens_ fenv venv [] code = (code, fenv, venv)
+codeGens_ fenv venv (e:es) code = codeGens_ (_getFEnv e_result) (_getVEnv e_result) es new_code
+    where
+        e_result = codeGen fenv venv e
+        new_code = codeAppend code (_getCode e_result) 
+
 codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
 
 codeGen fenv venv (NumberExprAST val) = (LCODE (show val), fenv, venv)
