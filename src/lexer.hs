@@ -5,7 +5,7 @@ data Token = TokEOF
     | TokDEF
     | TokEXTERN
     | TokIDENTIFIER String
-    | TokNUMBER Float
+    | TokNUMBER Int
     | TokChar Char 
     | TokIF
     | TokTHEN
@@ -55,7 +55,7 @@ getAlphaStr s i =
 
 getDigit :: String -> Int -> (Token, Int)
 getDigit s i =
-    let digitStr = getDigitStr s i in (TokNUMBER (read (fst digitStr) :: Float), snd digitStr)
+    let digitStr = getDigitStr s i in (TokNUMBER (read (fst digitStr) :: Int), snd digitStr)
 
 getDigitStr :: String -> Int -> (String, Int)
 getDigitStr s i =

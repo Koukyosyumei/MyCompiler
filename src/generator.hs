@@ -3,10 +3,10 @@ module Generator where
 import           Parser
 
 data Code = LCODE String | ERROR String deriving(Eq, Show)
-data SFloat = ACT Float | SYM String deriving(Eq, Show)
+data SInt = ACT Int | SYM String deriving(Eq, Show)
 
 type FEnv = [(String, [String])]
-type VEnv = [(String, SFloat)]
+type VEnv = [(String, SInt)]
 
 _getCode :: (Code, FEnv, VEnv) -> Code
 _getCode (a, b, c) = a
@@ -46,7 +46,7 @@ codeGen fenv venv (NumberExprAST val) = (LCODE (show val), fenv, venv)
 
 codeGen fenv namedValue (VariableExprAST name) =
     case (lookup name namedValue) of
-        Just (ACT val) -> (LCODE ("double " ++ (show val)), fenv, namedValue)
+        Just (ACT val) -> (LCODE ("i32 " ++ (show val)), fenv, namedValue)
         Just (SYM sym) -> (LCODE sym, fenv, namedValue)
         Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, namedValue)
 
@@ -63,7 +63,7 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
         resultVar = generateNewVarName "%calltmp" namedValue
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) =
-    (LCODE ("define double " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
+    (LCODE ("define i32 " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
      funcTable ++ [(fname', argNames)], 
      addVarName argNames namedValue)
     where
@@ -75,7 +75,7 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
                     LCODE b -> (LCODE (p ++ " {\n"
                                         ++ "entry:\n"
                                         ++ "\t" ++ b
-                                        ++ "\n\tret double " ++ (fst (localVars !! ((length localVars) - 1)))
+                                        ++ "\n\tret i32 " ++ (fst (localVars !! ((length localVars) - 1)))
                                         ++ "\n}\n"), 
                                 newfuncTable, 
                                 localVars)
@@ -90,9 +90,8 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
 codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable, (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
     where
         condCode = codeGen funcTable namedValue condAST
-        condRes  = LCODE ("\n\t%ifcond = " ++ fst (last (_getVEnv condCode)))
-        branchCode = LCODE ("\n\tbr i1 %ifcond, label %then, label %else\n")
-        entryCode = codeAppend (codeAppend (_getCode condCode) condRes) branchCode
+        branchCode = LCODE ("\n\tbr i1 " ++ (fst (last (_getVEnv condCode))) ++ ", label %then, label %else\n")
+        entryCode = codeAppend (_getCode condCode) branchCode
 
         thenBranch = codeGen (_getFEnv condCode) (_getVEnv condCode) thenAST
         thenBody = case thenAST of
@@ -114,7 +113,7 @@ codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTa
         elseCode = codeAppend (codeAppend (LCODE ("\nelse:")) elseBody)
                               (LCODE ("\n\tbr label %ifcont\n"))
 
-        contCode = codeAppend (codeAppend (LCODE ("\nifcont:\n\t%iftmp = phi double [ ")) thenRes)
+        contCode = codeAppend (codeAppend (LCODE ("\nifcont:\n\t%iftmp = phi i32 [ ")) thenRes)
                               (codeAppend (LCODE (", %then ], [ ")) (codeAppend elseRes (LCODE (", %else ]"))))
 
         code = codeAppend (codeAppend (codeAppend entryCode thenCode) elseCode) contCode
@@ -133,27 +132,27 @@ generateNewVarName' w i venv =
         Nothing -> w ++ show i
 
 fADD :: Code -> Code -> String -> Code
-fADD (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fadd double " ++ op1 ++ ", " ++ op2)
+fADD (LCODE op1) (LCODE op2) result = LCODE (result ++ " = add i32 " ++ op1 ++ ", " ++ op2)
 fADD (ERROR msg) _ _ = ERROR msg
 fADD _ (ERROR msg) _ = ERROR msg
 
 fSUB :: Code -> Code -> String -> Code
-fSUB (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fsub double " ++ op1 ++ ", " ++ op2)
+fSUB (LCODE op1) (LCODE op2) result = LCODE (result ++ " = sub i32 " ++ op1 ++ ", " ++ op2)
 fSUB (ERROR msg) _ _ = ERROR msg
 fSUB _ (ERROR msg) _ = ERROR msg
 
 fMUL :: Code -> Code -> String -> Code
-fMUL (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fmul double " ++ op1 ++ ", " ++ op2)
+fMUL (LCODE op1) (LCODE op2) result = LCODE (result ++ " = mul i32 " ++ op1 ++ ", " ++ op2)
 fMUL (ERROR msg) _ _ = ERROR msg
 fMUL _ (ERROR msg) _ = ERROR msg
 
 fCmpULT :: Code -> Code -> String -> Code
-fCmpULT (LCODE op1) (LCODE op2) result = LCODE (result ++ " = fcmp ult double " ++ op1 ++ ", " ++ op2)
+fCmpULT (LCODE op1) (LCODE op2) result = LCODE (result ++ " = icmp ult i32 " ++ op1 ++ ", " ++ op2)
 fCmpULT (ERROR msg) _ _ = ERROR msg
 fCmpULT _ (ERROR msg) _ = ERROR msg
 
 createCall :: String -> [Code] -> String -> Code
-createCall fname args result = LCODE (result ++ " = call double @" ++ fname ++ "(" ++ (joinWithComma args) ++ ")")
+createCall fname args result = LCODE (result ++ " = call i32 @" ++ fname ++ "(" ++ (joinWithComma args) ++ ")")
 
 codeAppend :: Code -> Code -> Code
 codeAppend (LCODE a) (LCODE b) = LCODE (a ++ b)
@@ -193,10 +192,10 @@ codeGenBinaryExpr funcTable namedValue exp = (codeGen funcTable namedValue exp, 
 
 joinWithComma :: [Code] -> String
 joinWithComma []             = ""
-joinWithComma [LCODE x]      = "double " ++ x
-joinWithComma ((LCODE x):xs) = "double " ++ x ++ ", " ++ joinWithComma xs
+joinWithComma [LCODE x]      = "i32 " ++ x
+joinWithComma ((LCODE x):xs) = "i32 " ++ x ++ ", " ++ joinWithComma xs
 
 joinWithCommaStr :: [String] -> String
 joinWithCommaStr []     = ""
-joinWithCommaStr [x]    = "%" ++ x
-joinWithCommaStr (x:xs) = "%" ++ x ++ ", " ++ joinWithCommaStr xs
+joinWithCommaStr [x]    = "i32 %" ++ x
+joinWithCommaStr (x:xs) = "i32 %" ++ x ++ ", " ++ joinWithCommaStr xs

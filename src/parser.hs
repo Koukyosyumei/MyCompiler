@@ -3,7 +3,7 @@ import           Data.Char (isAlpha, isAlphaNum, isDigit, isSpace)
 import           Lexer
 
 
-data ExprAST = NumberExprAST Float
+data ExprAST = NumberExprAST Int
     | VariableExprAST String
     | BinaryExprAST Char ExprAST ExprAST
     | CallExprAST String [ExprAST]
@@ -41,7 +41,7 @@ handleExtern s i = [fst (parseExtern s i)]
 handleTopLevelExpression :: String -> Int -> [ExprAST]
 handleTopLevelExpression s i = [fst (parseTopLevelExpr s i)]
 
-parseNumberExpr :: Float -> Int -> (ExprAST, Int)
+parseNumberExpr :: Int -> Int -> (ExprAST, Int)
 parseNumberExpr val i = (NumberExprAST val, i)
 
 -- parenexpr ::= '(' expression ')'

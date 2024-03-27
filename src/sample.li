@@ -1,5 +1,0 @@
-define double @main() {
-entry:
-	ret double 3.0e+00
-}
-
