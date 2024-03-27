@@ -15,21 +15,22 @@ data Token = TokEOF
 -- | getTok - Return the next token from standard input
 getTok :: String -> Int -> (Token, Int)
 getTok s i =
-    if isSpace (s !! i)
-        then getTok s (i + 1)
-        else
-            if isAlpha (s !! i)
-                then getAlpha s i
-            else if isDigit (s !! i)
-                then getDigit s i
-            else if (s !! i) == '.'
-                then getDigit s i
-            else if (s !! i) == '#'
-                then getComment s i
-            else if (length s) < i
-                then (TokEOF, i)
+    if (length s) <= i
+       then (TokEOF, i)
+    else
+        if isSpace (s !! i)
+            then getTok s (i + 1)
             else
-                (TokChar (s !! i), i + 1)
+                if isAlpha (s !! i)
+                    then getAlpha s i
+                else if isDigit (s !! i)
+                    then getDigit s i
+                else if (s !! i) == '.'
+                    then getDigit s i
+                else if (s !! i) == '#'
+                    then getComment s i
+                else
+                    (TokChar (s !! i), i + 1)
 
 getAlpha :: String -> Int -> (Token, Int)
 getAlpha s i =

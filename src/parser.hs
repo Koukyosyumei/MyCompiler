@@ -21,13 +21,16 @@ binoPrecedence = [('<', 10), ('+', 20), ('-', 20), ('*', 40)]
 parseTop :: String -> Int -> [ExprAST] -> [ExprAST]
 parseTop s i es =
     case (fst tokAndpos) of
-        TokEOF        -> es
+        TokEOF        -> []
         (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
-        TokDEF        -> es ++ (handleDefinition s i)
-        TokEXTERN     -> es ++ (handleExtern s i)
-        _             -> es ++ (handleTopLevelExpression s i)
+        TokDEF        -> es ++ [(fst parsedDEF)] ++ (parseTop s (snd parsedDEF) es)
+        TokEXTERN     -> es ++ [(fst parsedEXT)] ++ (parseTop s (snd parsedEXT) es) 
+        _             -> es ++ [(fst parsedTLE)] ++ (parseTop s (snd parsedTLE) es)
     where
         tokAndpos = getTok s i
+        parsedDEF = parseDefinition s i
+        parsedEXT = parseExtern s i
+        parsedTLE = parseTopLevelExpr s i
 
 handleDefinition :: String -> Int -> [ExprAST]
 handleDefinition s i = [fst (parseDefinition s i)]
