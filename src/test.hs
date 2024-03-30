@@ -28,6 +28,10 @@ main = do
     -- check "test2-1" (fst resultDigit1) (TokNUMBER 123.456)
     -- check "test2-2" (fst resultDigit2) (TokNUMBER 0.123)
 
+    let source0 = "1+3; 2*3; } "
+        sb0 = searchBlock source0 0 []
+    putStr (show sb0)
+
     let source1 = "def foo(x y) x+foo(y, 4);"
         top1 = parseTop source1 0 []
     check "test3-1" top1 [FunctionAST (PrototypeAST "foo" ["x","y"])

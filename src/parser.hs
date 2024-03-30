@@ -32,15 +32,6 @@ parseTop s i es =
         parsedEXT = parseExtern s i
         parsedTLE = parseTopLevelExpr s i
 
-handleDefinition :: String -> Int -> [ExprAST]
-handleDefinition s i = [fst (parseDefinition s i)]
-
-handleExtern :: String -> Int -> [ExprAST]
-handleExtern s i = [fst (parseExtern s i)]
-
-handleTopLevelExpression :: String -> Int -> [ExprAST]
-handleTopLevelExpression s i = [fst (parseTopLevelExpr s i)]
-
 parseNumberExpr :: Int -> Int -> (ExprAST, Int)
 parseNumberExpr val i = (NumberExprAST val, i)
 
@@ -133,6 +124,22 @@ parseExpression s i =
             then lhs
             else parseBinOpRHS 0 (fst lhs) s (snd lhs)
 
+-- block ::= {expression;*}
+searchBlock :: String -> Int -> [ExprAST] -> ([ExprAST], Int)
+searchBlock s i exprs =
+    if (length s <= i)
+        then (exprs, i) 
+    else if fst curTok == TokChar '}'
+        then (exprs, (snd curTok) + 1)
+    else if fst curTok == TokChar ';'
+        then searchBlock s ((snd nextExp) + 1) (exprs ++ [fst nextExp]) 
+    else
+        searchBlock s ((snd curExp) + 1) (exprs ++ [fst curExp]) 
+    where
+        curTok = getTok s i
+        curExp = parseExpression s i
+        nextTok = getTok s ((snd curTok) + 1)
+        nextExp = parseExpression s (snd nextTok)
 
 parsePrototype :: String -> Int -> (ExprAST, Int)
 parsePrototype s i =
