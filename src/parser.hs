@@ -35,7 +35,7 @@ parseTop s i es =
         TokEOF        -> []
         (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
         TokDEF        -> es ++ [(fst parsedDEF)] ++ (parseTop s (snd parsedDEF) es)
-        TokEXTERN     -> es ++ [(fst parsedEXT)] ++ (parseTop s (snd parsedEXT) es) 
+        TokEXTERN     -> es ++ [(fst parsedEXT)] ++ (parseTop s (snd parsedEXT) es)
         _             -> es ++ [(fst parsedTLE)] ++ (parseTop s (snd parsedTLE) es)
     where
         tokAndpos = getTok s i
@@ -134,13 +134,13 @@ parseBlock s i = (BlockAST (fst blocks), snd blocks)
 searchBlock :: String -> Int -> [ExprAST] -> ([ExprAST], Int)
 searchBlock s i exprs =
     if (length s <= i)
-        then (exprs, i) 
+        then (exprs, i)
     else if fst curTok == TokChar '}'
         then (exprs, (snd curTok) + 1)
     else if fst curTok == TokChar ';'
-        then searchBlock s ((snd nextExp) + 1) (exprs ++ [fst nextExp]) 
+        then searchBlock s ((snd nextExp) + 1) (exprs ++ [fst nextExp])
     else
-        searchBlock s ((snd curExp) + 1) (exprs ++ [fst curExp]) 
+        searchBlock s ((snd curExp) + 1) (exprs ++ [fst curExp])
     where
         curTok = getTok s i
         curExp = parseExpression s i

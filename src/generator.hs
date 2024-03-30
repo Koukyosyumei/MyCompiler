@@ -18,17 +18,17 @@ _getVEnv :: (Code, FEnv, VEnv) -> VEnv
 _getVEnv (a, b, c) = c
 
 addVarName :: [String] -> VEnv -> VEnv
-addVarName [] venv = venv
+addVarName [] venv     = venv
 addVarName (x:xs) venv = addVarName xs (venv ++ [(x, SYM ("%" ++ x))])
 
 needIntermediateVar :: ExprAST -> Bool
 needIntermediateVar (BinaryExprAST _ _ _) = True
-needIntermediateVar (CallExprAST _ _) = True
-needIntermediateVar _ = False
+needIntermediateVar (CallExprAST _ _)     = True
+needIntermediateVar _                     = False
 
 isBinaryExpr :: ExprAST -> Bool
 isBinaryExpr (BinaryExprAST _ _ _) = True
-isBinaryExpr _ = False
+isBinaryExpr _                     = False
 
 codeGens :: FEnv -> VEnv -> [ExprAST] -> (Code, FEnv, VEnv)
 codeGens fenv venv es = codeGens_ fenv venv es (LCODE "")
@@ -38,7 +38,7 @@ codeGens_ fenv venv [] code = (code, fenv, venv)
 codeGens_ fenv venv (e:es) code = codeGens_ (_getFEnv e_result) (_getVEnv e_result) es new_code
     where
         e_result = codeGen fenv venv e
-        new_code = codeAppend code (_getCode e_result) 
+        new_code = codeAppend code (_getCode e_result)
 
 codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
 
@@ -64,8 +64,8 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
         (new_funcTable, new_namedValue, intermediateCode, evaluatedArgs) = createArgs funcTable namedValue argExprs
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) =
-    (LCODE ("define i32 " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
-     funcTable ++ [(fname', argNames)], 
+    (LCODE ("define i32 " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")),
+     funcTable ++ [(fname', argNames)],
      addVarName argNames namedValue)
     where
         fname' = if fname == "" then "0" else fname
@@ -77,8 +77,8 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
                                         ++ "entry:\n"
                                         ++ "\t" ++ b
                                         ++ "\n\tret i32 " ++ (fst (localVars !! ((length localVars) - 1)))
-                                        ++ "\n}\n"), 
-                                newfuncTable, 
+                                        ++ "\n}\n"),
+                                newfuncTable,
                                 localVars)
                     ERROR msg -> (ERROR ("function body contains the following errors: " ++ msg), funcTable, namedValue)
         ERROR msg -> (ERROR ("function declaration contains the following errors: " ++ msg), funcTable, namedValue)
@@ -88,7 +88,8 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
         bodyCODE = codeGen newfuncTable (namedValue ++ (_getVEnv prototypeCODE)) body
         localVars = _getVEnv bodyCODE
 
-codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable, (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
+codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable,
+                                                                    (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
     where
         condCode = codeGen funcTable namedValue condAST
         branchCode = LCODE ("\n\tbr i1 " ++ (fst (last (_getVEnv condCode))) ++ ", label %then, label %else\n")
@@ -98,9 +99,9 @@ codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTa
         thenBody = case thenAST of
                      NumberExprAST x -> LCODE ("")
                      _ -> codeAppend (LCODE "\n\t") (_getCode thenBranch)
-        thenRes = case thenAST of 
+        thenRes = case thenAST of
                      NumberExprAST x -> LCODE (show x)
-                     _ -> LCODE (fst (last (_getVEnv thenBranch)))
+                     _               -> LCODE (fst (last (_getVEnv thenBranch)))
         thenCode = codeAppend (codeAppend (LCODE ("\nthen:")) thenBody)
                               (LCODE ("\n\tbr label %ifcont\n"))
 
@@ -110,7 +111,7 @@ codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTa
                      _ -> codeAppend (LCODE "\n\t") (_getCode elseBranch)
         elseRes = case elseAST of
                      NumberExprAST x -> LCODE (show x)
-                     _ -> LCODE (fst (last (_getVEnv elseBranch)))
+                     _               -> LCODE (fst (last (_getVEnv elseBranch)))
         elseCode = codeAppend (codeAppend (LCODE ("\nelse:")) elseBody)
                               (LCODE ("\n\tbr label %ifcont\n"))
 
@@ -184,7 +185,7 @@ codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
         intermediateCodeL = if needIntermediateVar lhs then codeAppend (_getCode (fst lbranch)) (LCODE "\n\t") else LCODE ("")
         lterm = if needIntermediateVar lhs then LCODE (snd lbranch) else _getCode (fst lbranch)
         namedValueL = if needIntermediateVar lhs then namedValue ++ (_getVEnv (fst lbranch)) else namedValue
-        
+
         rbranch = codeGenBinaryExpr funcTable namedValueL rhs
         intermediateCodeR = if needIntermediateVar rhs then codeAppend (_getCode (fst rbranch)) (LCODE "\n\t") else LCODE ("")
         rterm = if needIntermediateVar rhs then LCODE (snd rbranch) else _getCode (fst rbranch)
