@@ -14,6 +14,6 @@ main = do
     let source = head args
         top = parseTop source 0 []
         code = codeGens [] [] top
-    -- putStrLn (show top)
+    putStrLn (show top)
     putStrLn (code2str (_getCode code))
 

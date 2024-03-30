@@ -120,6 +120,12 @@ codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTa
 
         code = codeAppend (codeAppend (codeAppend entryCode thenCode) elseCode) contCode
 
+codeGen funcTable namedValue (BlockAST []) = (LCODE "", funcTable, namedValue)
+codeGen funcTable namedValue (BlockAST (e:exprs)) = (codeAppendN (_getCode e_result) (_getCode exprs_result), _getFEnv exprs_result, _getVEnv exprs_result)
+    where
+        e_result = codeGen funcTable namedValue (e)
+        exprs_result = codeGen (_getFEnv e_result) (_getVEnv e_result) (BlockAST exprs)
+
 codeGen funcTable namedValue ast = (errormsg, funcTable, namedValue)
     where
         errormsg = ERROR ("Unexpected inputs for codeGen:\n" ++ "\tfuncTable = " ++ (show funcTable) ++ "\n\tnamedValue = " ++ (show namedValue) ++ "\n\tast = " ++ (show ast) ++ "\n")
@@ -157,11 +163,15 @@ createCall :: String -> [Code] -> String -> Code
 createCall fname args result = LCODE (result ++ " = call i32 @" ++ fname ++ "(" ++ (joinWithComma args) ++ ")")
 
 codeAppend :: Code -> Code -> Code
+codeAppend (ERROR msg) _ = ERROR msg
+codeAppend _ (ERROR msg) = ERROR msg
 codeAppend (LCODE a) (LCODE b) = LCODE (a ++ b)
 
 codeAppendN :: Code -> Code -> Code
-codeAppendN (LCODE "") b = b
-codeAppendN a (LCODE "") = a
+codeAppendN (ERROR msg) _ = ERROR msg
+codeAppendN _ (ERROR msg) = ERROR msg
+codeAppendN (LCODE "") b        = b
+codeAppendN a (LCODE "")        = a
 codeAppendN (LCODE a) (LCODE b) = LCODE (a ++ "\n" ++ b)
 
 createArgs :: FEnv -> VEnv -> [ExprAST] -> (FEnv, VEnv, Code, [Code])

@@ -28,17 +28,19 @@ isError :: ExprAST -> Bool
 isError (Error _) = True
 isError _         = False
 
--- top ::= definition | external | expression | ;
+-- top ::= definition | external | expression | {expression;*} | ;
 parseTop :: String -> Int -> [ExprAST] -> [ExprAST]
 parseTop s i es =
     case (fst tokAndpos) of
         TokEOF        -> []
         (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
+        (TokChar '{') -> es ++ [(fst parsedBLC)] ++ (parseTop s (snd parsedBLC) es)
         TokDEF        -> es ++ [(fst parsedDEF)] ++ (parseTop s (snd parsedDEF) es)
         TokEXTERN     -> es ++ [(fst parsedEXT)] ++ (parseTop s (snd parsedEXT) es)
         _             -> es ++ [(fst parsedTLE)] ++ (parseTop s (snd parsedTLE) es)
     where
         tokAndpos = getTok s i
+        parsedBLC = parseBlock s i
         parsedDEF = parseDefinition s i
         parsedEXT = parseExtern s i
         parsedTLE = parseTopLevelExpr s i
@@ -90,6 +92,7 @@ parsePrimary s i =
         TokIDENTIFIER name -> parseIdentifierExpr name s i
         TokNUMBER val -> parseNumberExpr val (snd curTok)
         TokChar '(' -> parseParentExpr s (snd curTok)
+        TokChar '{' -> parseBlock s (snd curTok)
         TokIF -> parseIfExpr s i
         _ -> (Error ("unknown token when parsing a primary expression: " ++ show (fst curTok)), i)
     where
@@ -231,4 +234,4 @@ parseTopLevelExpr s i =
         Error msg -> e
         _         -> (FunctionAST (PrototypeAST "" []) (fst e), snd e)
     where
-        e = parseExpression s i
+        e = parseBlockOrExpression s i
