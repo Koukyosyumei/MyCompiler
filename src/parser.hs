@@ -34,13 +34,13 @@ parseTop s i es =
     case (fst tokAndpos) of
         TokEOF        -> []
         (TokChar ';') -> es ++ (parseTop s (snd tokAndpos) es)
-        (TokChar '{') -> es ++ [(fst parsedBLC)] ++ (parseTop s (snd parsedBLC) es)
+        -- (TokChar '{') -> es ++ [(fst parsedBLC)] ++ (parseTop s (snd parsedBLC) es)
         TokDEF        -> es ++ [(fst parsedDEF)] ++ (parseTop s (snd parsedDEF) es)
         TokEXTERN     -> es ++ [(fst parsedEXT)] ++ (parseTop s (snd parsedEXT) es)
         _             -> es ++ [(fst parsedTLE)] ++ (parseTop s (snd parsedTLE) es)
     where
         tokAndpos = getTok s i
-        parsedBLC = parseBlock s i
+        -- parsedBLC = parseBlock s i
         parsedDEF = parseDefinition s i
         parsedEXT = parseExtern s i
         parsedTLE = parseTopLevelExpr s i
@@ -153,7 +153,7 @@ searchBlock s i exprs =
 parseBlockOrExpression :: String -> Int -> (ExprAST, Int)
 parseBlockOrExpression s i =
     if fst curTok == TokChar '{'
-        then parseBlock s ((snd curTok) + 1)
+        then parseBlock s ((snd curTok))
     else
         parseExpression s i
     where
