@@ -10,12 +10,23 @@ data ExprAST = NumberExprAST Int
     | PrototypeAST String [String]
     | FunctionAST ExprAST ExprAST  -- the first ExprAST should be PrototypeAST
     | IfExprAST ExprAST ExprAST ExprAST
+    | BlockAST [ExprAST]
     | NullAST
     | Error String
     deriving (Eq, Show)
 
 binoPrecedence :: [(Char, Int)]
 binoPrecedence = [('<', 10), ('+', 20), ('-', 20), ('*', 40)]
+
+getTokPrecedence :: Char -> Int
+getTokPrecedence c =
+    case lookup c binoPrecedence of
+        Nothing -> -1
+        Just v  -> v
+
+isError :: ExprAST -> Bool
+isError (Error _) = True
+isError _         = False
 
 -- top ::= definition | external | expression | ;
 parseTop :: String -> Int -> [ExprAST] -> [ExprAST]
@@ -35,17 +46,6 @@ parseTop s i es =
 parseNumberExpr :: Int -> Int -> (ExprAST, Int)
 parseNumberExpr val i = (NumberExprAST val, i)
 
--- parenexpr ::= '(' expression ')'
-parseParentExpr :: String -> Int -> (ExprAST, Int)
-parseParentExpr s i =
-    if (fst v) == NullAST
-        then v
-    else if (s !! (i + 1)) /= ')'
-        then (Error "expexted ')'", i)
-    else
-        (fst v, i + 1)
-    where
-        v = parseExpression s i
 
 -- identifierexpr ::= identifier | identifier '(( expresion* ')'
 parseIdentifierExpr :: String -> String -> Int -> (ExprAST, Int)
@@ -71,6 +71,18 @@ parseCallExpr idName args s i =
         curTok = getTok s i
         newArg = parseExpression s i
 
+-- parenexpr ::= '(' expression ')'
+parseParentExpr :: String -> Int -> (ExprAST, Int)
+parseParentExpr s i =
+    if (fst v) == NullAST
+        then v
+    else if (s !! (i + 1)) /= ')'
+        then (Error "expexted ')'", i)
+    else
+        (fst v, i + 1)
+    where
+        v = parseExpression s i
+
 -- primary ::= identifierexpr | numberexpr | parenexpr
 parsePrimary :: String -> Int -> (ExprAST, Int)
 parsePrimary s i =
@@ -82,16 +94,6 @@ parsePrimary s i =
         _ -> (Error ("unknown token when parsing a primary expression: " ++ show (fst curTok)), i)
     where
         curTok = getTok s i
-
-getTokPrecedence :: Char -> Int
-getTokPrecedence c =
-    case lookup c binoPrecedence of
-        Nothing -> -1
-        Just v  -> v
-
-isError :: ExprAST -> Bool
-isError (Error _) = True
-isError _         = False
 
 -- binoprhs ::= (+ primary)*
 parseBinOpRHS :: Int -> ExprAST -> String -> Int -> (ExprAST, Int)
@@ -125,6 +127,10 @@ parseExpression s i =
             else parseBinOpRHS 0 (fst lhs) s (snd lhs)
 
 -- block ::= {expression;*}
+parseBlock :: String -> Int -> (ExprAST, Int)
+parseBlock s i = (BlockAST (fst blocks), snd blocks)
+    where blocks = searchBlock s i []
+
 searchBlock :: String -> Int -> [ExprAST] -> ([ExprAST], Int)
 searchBlock s i exprs =
     if (length s <= i)
@@ -140,6 +146,15 @@ searchBlock s i exprs =
         curExp = parseExpression s i
         nextTok = getTok s ((snd curTok) + 1)
         nextExp = parseExpression s (snd nextTok)
+
+parseBlockOrExpression :: String -> Int -> (ExprAST, Int)
+parseBlockOrExpression s i =
+    if fst curTok == TokChar '{'
+        then parseBlock s ((snd curTok) + 1)
+    else
+        parseExpression s i
+    where
+        curTok = getTok s i
 
 parsePrototype :: String -> Int -> (ExprAST, Int)
 parsePrototype s i =
@@ -169,13 +184,13 @@ parseArgNames s i =
                 curTok = getTok s i
                 nextArgs = getArgNames s (snd curTok)
 
--- definition ::= 'def' prototype expression
+-- definition ::= 'def' prototype (expression | block)
 parseDefinition :: String -> Int -> (ExprAST, Int)
 parseDefinition s i =
     let proto = parsePrototype s (snd curTok) in
         case (fst proto) of
             Error msg -> (Error msg, snd proto)
-            _ -> let e = parseExpression s (snd proto) in
+            _ -> let e = parseBlockOrExpression s (snd proto) in
                     case (fst e) of
                         NullAST -> e
                         Error _ -> e
@@ -190,7 +205,7 @@ parseExtern s i =
     where
         curTok = getTok s i -- eat `extern`
 
--- ifexpr ::= 'if' expression 'then' expression 'else' expression
+-- ifexpr ::= 'if' expression 'then' (exprssion | block) 'else' (expression | block)
 parseIfExpr :: String -> Int -> (ExprAST, Int)
 parseIfExpr s i =
     case (fst condExpr) of
@@ -204,11 +219,11 @@ parseIfExpr s i =
         curIf = getTok s i -- eat `if`
         condExpr = parseExpression s (snd curIf)
         curThen = getTok s (snd condExpr)
-        thenExpr = parseExpression s (snd curThen)
+        thenExpr = parseBlockOrExpression s (snd curThen)
         curElse = getTok s (snd thenExpr)
-        elseExpr = parseExpression s (snd curElse)
+        elseExpr = parseBlockOrExpression s (snd curElse)
 
--- topLevelexpr ::= expression
+-- topLevelexpr
 parseTopLevelExpr :: String -> Int -> (ExprAST, Int)
 parseTopLevelExpr s i =
     case (fst e) of

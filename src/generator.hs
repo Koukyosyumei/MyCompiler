@@ -56,11 +56,12 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
     case (lookup fname funcTable) of
         Just argNames -> if (length argNames /= length argExprs)
                             then (ERROR "Incorrect # arguments passed", funcTable, namedValue)
-                            else (createCall fname (map (\arg -> _getCode (codeGen funcTable namedValue arg)) argExprs) resultVar,
-                                 funcTable, namedValue ++ [(resultVar, SYM resultVar)])
+                            else (codeAppend (codeAppend intermediateCode (LCODE "\t")) (createCall fname evaluatedArgs resultVar),
+                                 new_funcTable, new_namedValue ++ [(resultVar, SYM resultVar)])
         Nothing -> (ERROR "Unknown functino referenced", funcTable, namedValue)
     where
         resultVar = generateNewVarName "%calltmp" namedValue
+        (new_funcTable, new_namedValue, intermediateCode, evaluatedArgs) = createArgs funcTable namedValue argExprs
 
 codeGen funcTable namedValue (PrototypeAST fname argNames) =
     (LCODE ("define i32 " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")), 
@@ -157,6 +158,18 @@ createCall fname args result = LCODE (result ++ " = call i32 @" ++ fname ++ "(" 
 codeAppend :: Code -> Code -> Code
 codeAppend (LCODE a) (LCODE b) = LCODE (a ++ b)
 
+codeAppendN :: Code -> Code -> Code
+codeAppendN (LCODE a) (LCODE b) = LCODE (a ++ "\n" ++ b)
+
+createArgs :: FEnv -> VEnv -> [ExprAST] -> (FEnv, VEnv, Code, [Code])
+createArgs ft nv [] = (ft, nv, LCODE "", [])
+createArgs ft nv (a:aexprs) = (n_ft, n_nv, codeAppendN a_intermediateCode n_intermediateCode, [a_evaluated] ++ n_evaluated)
+    where
+        a_intermediate = codeGen ft nv a
+        (a_intermediateCode, a_evaluated) = case a of
+            NumberExprAST num -> (LCODE "", LCODE (show num))
+            _ -> (_getCode (a_intermediate), LCODE (fst (last (_getVEnv a_intermediate))))
+        (n_ft, n_nv, n_intermediateCode, n_evaluated) = createArgs (_getFEnv a_intermediate) (_getVEnv a_intermediate) aexprs
 
 codeGenBinaryExpr:: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
 codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
