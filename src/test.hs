@@ -6,11 +6,11 @@ check :: (Eq a, Show a) => String -> a -> a -> IO()
 check s c v = do
     if c == v
         then putStrLn $ s ++ ": OK"
-        else putStrLn $ s ++ ": NG (" ++ show c ++ " /= " ++ show v ++ ")"
+        else putStrLn $ s ++ ": NG\na = " ++ show c ++ "\nb = " ++ show v
 
 code2str :: Code -> String
 code2str (LCODE code) = code
-code2str (ERROR msg) = "ERROR: " ++ msg
+code2str (ERROR msg)  = "ERROR: " ++ msg
 
 main :: IO ()
 main = do
@@ -63,5 +63,5 @@ main = do
         top5 = parseTop source5 0 []
         code5 = codeGen [] [] (top5 !! 0)
     check "test3-5-0" top5 [FunctionAST (PrototypeAST "fib" ["x"]) (IfExprAST (BinaryExprAST '<' (VariableExprAST "x") (NumberExprAST 3)) (NumberExprAST 1) (BinaryExprAST '+' (CallExprAST "fib" [BinaryExprAST '-' (VariableExprAST "x") (NumberExprAST 1)]) (CallExprAST "fib" [BinaryExprAST '-' (VariableExprAST "x") (NumberExprAST 2)])))]
-    check "test3-5-1" (code2str (_getCode code5)) "define i32 @fib(i32 %x) {\nentry:\n\t%cmptmp0 = cmp ult i32 %x, 3\n\t%ifcond = %cmptmp0\n\tbr i1 %ifcond, label %then, label %else\n\nthen:\n\tbr label %ifcont\n\nelse:\n\t%calltmp0 = call i32 @fib(i32 %subtmp0 = sub i32 %x, 1)\n\t%calltmp1 = call i32 @fib(i32 %subtmp0 = sub i32 %x, 2)\n\t%addtmp0 = add i32 %calltmp0, %calltmp1\n\tbr label %ifcont\n\nifcont:\n\t%iftmp = phi i32 [ 1, %then ], [ %addtmp0, %else ]\n\tret i32 %iftmp\n}\n"
+    check "test3-5-1" (code2str (_getCode code5)) "define i32 @fib(i32 %x) {\nentry:\n\t%cmptmp0 = icmp ult i32 %x, 3\n\tbr i1 %cmptmp0, label %then, label %else\n\nthen:\n\tbr label %ifcont\n\nelse:\n\t%subtmp0 = sub i32 %x, 1%calltmp0 = call i32 @fib(i32 %subtmp0)\n\t%subtmp1 = sub i32 %x, 2%calltmp1 = call i32 @fib(i32 %subtmp1)\n\t%addtmp0 = add i32 %calltmp0, %calltmp1\n\tbr label %ifcont\n\nifcont:\n\t%iftmp = phi i32 [ 1, %then ], [ %addtmp0, %else ]\n\tret i32 %iftmp\n}\n"
 

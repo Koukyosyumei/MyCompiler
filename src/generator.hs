@@ -56,7 +56,7 @@ codeGen funcTable namedValue (CallExprAST fname argExprs) =
     case (lookup fname funcTable) of
         Just argNames -> if (length argNames /= length argExprs)
                             then (ERROR "Incorrect # arguments passed", funcTable, namedValue)
-                            else (codeAppend (codeAppend intermediateCode (LCODE "\t")) (createCall fname evaluatedArgs resultVar),
+                            else (codeAppend intermediateCode (createCall fname evaluatedArgs resultVar),
                                  new_funcTable, new_namedValue ++ [(resultVar, SYM resultVar)])
         Nothing -> (ERROR "Unknown functino referenced", funcTable, namedValue)
     where
@@ -160,6 +160,8 @@ codeAppend :: Code -> Code -> Code
 codeAppend (LCODE a) (LCODE b) = LCODE (a ++ b)
 
 codeAppendN :: Code -> Code -> Code
+codeAppendN (LCODE "") b = b
+codeAppendN a (LCODE "") = a
 codeAppendN (LCODE a) (LCODE b) = LCODE (a ++ "\n" ++ b)
 
 createArgs :: FEnv -> VEnv -> [ExprAST] -> (FEnv, VEnv, Code, [Code])
@@ -169,6 +171,7 @@ createArgs ft nv (a:aexprs) = (n_ft, n_nv, codeAppendN a_intermediateCode n_inte
         a_intermediate = codeGen ft nv a
         (a_intermediateCode, a_evaluated) = case a of
             NumberExprAST num -> (LCODE "", LCODE (show num))
+            VariableExprAST vname -> (LCODE "",  _getCode (codeGen ft nv a))
             _ -> (_getCode (a_intermediate), LCODE (fst (last (_getVEnv a_intermediate))))
         (n_ft, n_nv, n_intermediateCode, n_evaluated) = createArgs (_getFEnv a_intermediate) (_getVEnv a_intermediate) aexprs
 
