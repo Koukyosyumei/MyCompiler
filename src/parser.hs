@@ -16,7 +16,7 @@ data ExprAST = NumberExprAST Int
     deriving (Eq, Show)
 
 binoPrecedence :: [(Char, Int)]
-binoPrecedence = [('<', 10), ('+', 20), ('-', 20), ('*', 40)]
+binoPrecedence = [('=', 5), ('<', 10), ('+', 20), ('-', 20), ('*', 40)]
 
 getTokPrecedence :: Char -> Int
 getTokPrecedence c =
