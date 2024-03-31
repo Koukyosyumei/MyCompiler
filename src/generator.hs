@@ -28,10 +28,14 @@ addVarName :: [String] -> VEnv -> VEnv
 addVarName [] venv     = venv
 addVarName (x:xs) venv = addVarName xs (venv ++ [(x, SYM ("%" ++ x))])
 
-needIntermediateVar :: ExprAST -> Bool
-needIntermediateVar (BinaryExprAST _ _ _) = True
-needIntermediateVar (CallExprAST _ _)     = True
-needIntermediateVar _                     = False
+needIntermediateVar :: ExprAST -> VEnv -> Bool
+needIntermediateVar (BinaryExprAST _ _ _) _  = True
+needIntermediateVar (CallExprAST _ _) _      = True
+needIntermediateVar (VariableExprAST x) venv = 
+    case lookup x venv of
+        Just (PTR _) -> True
+        _ -> False
+needIntermediateVar _ _                      = False
 
 isBinaryExpr :: ExprAST -> Bool
 isBinaryExpr (BinaryExprAST _ _ _) = True
@@ -55,6 +59,7 @@ codeGen fenv namedValue (VariableExprAST name) =
     case (lookup name namedValue) of
         Just (ACT val) -> (LCODE ("i32 " ++ (show val)), fenv, namedValue)
         Just (SYM sym) -> (LCODE sym, fenv, namedValue)
+        Just (PTR ptl) -> (LCODE ptl, fenv, namedValue)
         Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, namedValue)
 
 codeGen funcTable namedValue (BinaryExprAST op lhs rhs) = fst (codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs))
@@ -207,7 +212,6 @@ codePrepStoreExpr funcTable namedValue (BinaryExprAST '=' (VariableExprAST vname
         Nothing -> ((LCODE ("\t%" ++ vname ++ " = alloca i32, align 4\n"), funcTable, namedValue ++ [(vname, PTR ("%" ++ vname))]), "%" ++ vname)
 codePrepStoreExpr funcTable namedValue _ = ((ERROR "The left term of `=` should be a variable name.", funcTable, namedValue), "")
 
-
 codeGenBinaryExpr:: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
 codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
     case op of
@@ -222,14 +226,14 @@ codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
         _ -> ((ERROR "invalid binary operator", funcTable, namedValueLR), newVar)
     where
         lbranch = codeGenBinaryExpr funcTable namedValue lhs
-        intermediateCodeL = if needIntermediateVar lhs then codeAppend (_getCode (fst lbranch)) (LCODE "\n") else LCODE ("")
-        lterm = if needIntermediateVar lhs then LCODE (snd lbranch) else _getCode (fst lbranch)
-        namedValueL = if needIntermediateVar lhs then namedValue ++ (_getVEnv (fst lbranch)) else namedValue
+        intermediateCodeL = if needIntermediateVar lhs namedValue then codeAppend (_getCode (fst lbranch)) (LCODE "\n") else LCODE ("")
+        lterm = if needIntermediateVar lhs namedValue then LCODE (snd lbranch) else _getCode (fst lbranch)
+        namedValueL = if needIntermediateVar lhs namedValue then namedValue ++ (_getVEnv (fst lbranch)) else namedValue
 
         rbranch = codeGenBinaryExpr funcTable namedValueL rhs
-        intermediateCodeR = if needIntermediateVar rhs then codeAppend (_getCode (fst rbranch)) (LCODE "\n") else LCODE ("")
-        rterm = if needIntermediateVar rhs then LCODE (snd rbranch) else _getCode (fst rbranch)
-        namedValueLR = if needIntermediateVar rhs then  namedValueL ++ (_getVEnv (fst rbranch)) else namedValueL
+        intermediateCodeR = if needIntermediateVar rhs namedValue then codeAppend (_getCode (fst rbranch)) (LCODE "\n") else LCODE ("")
+        rterm = if needIntermediateVar rhs namedValue then LCODE (snd rbranch) else _getCode (fst rbranch)
+        namedValueLR = if needIntermediateVar rhs namedValue then  namedValueL ++ (_getVEnv (fst rbranch)) else namedValueL
 
         newVar = case op of
                         '+' -> generateNewVarName "%addtmp" namedValueLR
@@ -243,6 +247,13 @@ codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
 codeGenBinaryExpr funcTable namedValue (CallExprAST fname argExprs) = (callResult, fst (last (_getVEnv callResult)))
     where
         callResult = codeGen funcTable namedValue (CallExprAST fname argExprs)
+
+codeGenBinaryExpr funcTable namedValue (VariableExprAST x) =
+    case lookup x namedValue of 
+        Just (PTR ptr) -> ((LCODE ("\n\t" ++ v ++ " = load i32, i32* " ++ ptr ++ ", align 4"), funcTable, namedValue ++ [(v, SYM v)]), "")
+            where
+                v = generateNewVarName ptr namedValue
+        _ -> (codeGen funcTable namedValue (VariableExprAST x), "")
 
 codeGenBinaryExpr funcTable namedValue exp = (codeGen funcTable namedValue exp, "")
 
