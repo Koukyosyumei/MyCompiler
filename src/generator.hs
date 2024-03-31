@@ -3,7 +3,7 @@ module Generator where
 import           Parser
 
 data Code = LCODE String | ERROR String deriving(Eq, Show)
-data SInt = ACT Int | SYM String deriving(Eq, Show)
+data SInt = ACT Int | SYM String | PTR String deriving(Eq, Show)
 
 type FEnv = [(String, [String])]
 type VEnv = [(String, SInt)]
@@ -17,9 +17,12 @@ _getFEnv (a, b, c) = b
 _getVEnv :: (Code, FEnv, VEnv) -> VEnv
 _getVEnv (a, b, c) = c
 
-_getVal :: SInt -> String
-_getVal (ACT x) = show x
-_getVal (SYM x) = x
+_getVal :: SInt -> VEnv -> (String, String)
+_getVal (ACT x) _ = ("", show x)
+_getVal (SYM x) _ = ("", x)
+_getVal (PTR x) venv = ("\n\t" ++ v ++ " = load i32, i32* " ++ x ++ ", align 4", v)
+    where
+        v = generateNewVarName x venv
 
 addVarName :: [String] -> VEnv -> VEnv
 addVarName [] venv     = venv
@@ -81,8 +84,8 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
                                     then (ERROR "A function should return a value.", newfuncTable, localVars)
                                     else (LCODE (p ++ " {\n"
                                         ++ "entry:\n"
-                                        ++ b
-                                        ++ "\n\tret i32 " ++ (_getVal . snd . last) localVars
+                                        ++ b ++ (fst retInstr)
+                                        ++ "\n\tret i32 " ++ (snd retInstr)
                                         ++ "\n}\n"),
                                         newfuncTable,
                                         localVars)
@@ -93,6 +96,7 @@ codeGen funcTable namedValue (FunctionAST prototype body) =
         newfuncTable  = _getFEnv prototypeCODE
         bodyCODE      = codeGen newfuncTable (namedValue ++ (_getVEnv prototypeCODE)) body
         localVars     = _getVEnv bodyCODE
+        retInstr      = _getVal ((snd . last) localVars) namedValue
 
 codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable,
                                                                     (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
@@ -132,7 +136,10 @@ codeGen funcTable namedValue (BlockAST (e:exprs)) = (codeAppendN (_getCode e_res
 
 codeGen funcTable namedValue ast = (errormsg, funcTable, namedValue)
     where
-        errormsg = ERROR ("Unexpected inputs for codeGen:\n" ++ "\tfuncTable = " ++ (show funcTable) ++ "\n\tnamedValue = " ++ (show namedValue) ++ "\n\tast = " ++ (show ast) ++ "\n")
+        errormsg = ERROR ("Unexpected inputs for codeGen:\n" ++ 
+                            "\tfuncTable = " ++ (show funcTable) ++ 
+                            "\n\tnamedValue = " ++ (show namedValue) ++ 
+                            "\n\tast = " ++ (show ast) ++ "\n")
 
 generateNewVarName :: String -> VEnv -> String
 generateNewVarName w venv = generateNewVarName' w 0 venv
@@ -197,7 +204,7 @@ codePrepStoreExpr:: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
 codePrepStoreExpr funcTable namedValue (BinaryExprAST '=' (VariableExprAST vname) rhs) =
     case lookup vname namedValue of
         Just _ -> ((LCODE "", funcTable, namedValue), "%" ++ vname)
-        Nothing -> ((LCODE ("\t%" ++ vname ++ " = alloca i32, align 4\n"), funcTable, namedValue ++ [(vname, SYM ("%" ++ vname))]), "%" ++ vname)
+        Nothing -> ((LCODE ("\t%" ++ vname ++ " = alloca i32, align 4\n"), funcTable, namedValue ++ [(vname, PTR ("%" ++ vname))]), "%" ++ vname)
 codePrepStoreExpr funcTable namedValue _ = ((ERROR "The left term of `=` should be a variable name.", funcTable, namedValue), "")
 
 
