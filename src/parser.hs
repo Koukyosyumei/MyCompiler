@@ -3,28 +3,32 @@ module Parser where
 import Data.Char (isAlpha, isAlphaNum, isDigit, isSpace)
 import Lexer
 
+-- Data type for Abstract Syntax Tree (AST) elements
 data ExprAST
-  = NumberExprAST Int
-  | VariableExprAST String
-  | BinaryExprAST Char ExprAST ExprAST
-  | CallExprAST String [ExprAST]
-  | PrototypeAST String [String]
-  | FunctionAST ExprAST ExprAST -- the first ExprAST should be PrototypeAST
-  | IfExprAST ExprAST ExprAST ExprAST
-  | BlockAST [ExprAST]
-  | NullAST
-  | Error String
+  = NumberExprAST Int -- Stores a numeric value
+  | VariableExprAST String -- Stores a variable name
+  | BinaryExprAST Char ExprAST ExprAST -- Binary operation (operator, left operand, right operand)
+  | CallExprAST String [ExprAST] -- Function call (name, arguments)
+  | PrototypeAST String [String]  -- Function prototype (name, argument names)
+  | FunctionAST ExprAST ExprAST -- Function definition (prototype, body)
+  | IfExprAST ExprAST ExprAST ExprAST -- Conditional expression (condition, then expr, else expr)
+  | BlockAST [ExprAST] -- Block of expressions
+  | NullAST -- Special value for parsing errors or empty expressions
+  | Error String -- Represents a parsing error with a message
   deriving (Eq, Show)
 
+-- Precedence levels for binary operators
 binoPrecedence :: [(Char, Int)]
 binoPrecedence = [('=', 5), ('<', 10), ('+', 20), ('-', 20), ('*', 40)]
 
+-- Get precedence level of an operator character
 getTokPrecedence :: Char -> Int
 getTokPrecedence c =
   case lookup c binoPrecedence of
     Nothing -> -1
     Just v -> v
 
+-- Check if an expression is an error
 isError :: ExprAST -> Bool
 isError (Error _) = True
 isError _ = False
