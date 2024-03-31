@@ -2,42 +2,52 @@ module Generator where
 
 import Parser
 
+-- Data type representing the generated code
 data Code
   = LCODE String
   | ERROR String
   deriving (Eq, Show)
 
+-- Data type representing a symbolic value
 data SInt
   = ACT Int
   | SYM String
   | PTR String
   deriving (Eq, Show)
 
+-- Type alias for function environment (function name -> argument names)
 type FEnv = [(String, [String])]
 
+-- Type alias for variable environment (variable name -> symbolic value)
 type VEnv = [(String, SInt)]
 
+-- Function to extract code from a combined result (code, function env, variable env)
 _getCode :: (Code, FEnv, VEnv) -> Code
 _getCode (a, b, c) = a
 
+-- Function to extract function environment from a combined result
 _getFEnv :: (Code, FEnv, VEnv) -> FEnv
 _getFEnv (a, b, c) = b
 
+-- Function to extract variable environment from a combined result
 _getVEnv :: (Code, FEnv, VEnv) -> VEnv
 _getVEnv (a, b, c) = c
 
+-- Function to get the actual value from a symbolic representation (variable name or pointer)
 _getVal :: SInt -> VEnv -> (String, String)
 _getVal (ACT x) _ = ("", show x)
 _getVal (SYM x) _ = ("", x)
 _getVal (PTR x) venv =
   ("\n\t" ++ v ++ " = load i32, i32* " ++ x ++ ", align 4", v)
   where
-    v = generateNewVarName x venv
+    v = generateNewVarName x venv -- Generate a new variable name to save the loaded value
 
+-- Function to add a new variable name to the variable environment
 addVarName :: [String] -> VEnv -> VEnv
 addVarName [] venv = venv
 addVarName (x:xs) venv = addVarName xs (venv ++ [(x, SYM ("%" ++ x))])
 
+-- Function to check if an intermediate variable is needed for an expression (e.g., binary operations, function calls)
 needIntermediateVar :: ExprAST -> VEnv -> Bool
 needIntermediateVar (BinaryExprAST _ _ _) _ = True
 needIntermediateVar (CallExprAST _ _) _ = True
@@ -47,13 +57,16 @@ needIntermediateVar (VariableExprAST x) venv =
     _ -> False
 needIntermediateVar _ _ = False
 
+-- Function to check if the expression is a binary expression
 isBinaryExpr :: ExprAST -> Bool
 isBinaryExpr (BinaryExprAST _ _ _) = True
 isBinaryExpr _ = False
 
+-- Main function for code generation
 codeGens :: FEnv -> VEnv -> [ExprAST] -> (Code, FEnv, VEnv)
 codeGens fenv venv es = codeGens_ fenv venv es (LCODE "")
 
+-- Helper function for recursive code generation
 codeGens_ :: FEnv -> VEnv -> [ExprAST] -> Code -> (Code, FEnv, VEnv)
 codeGens_ fenv venv [] code = (code, fenv, venv)
 codeGens_ fenv venv (e:es) code =
@@ -62,6 +75,7 @@ codeGens_ fenv venv (e:es) code =
     e_result = codeGen fenv venv e
     new_code = codeAppend code (_getCode e_result)
 
+-- Function to generate code for a single expression
 codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
 codeGen fenv venv (NumberExprAST val) = (LCODE (show val), fenv, venv)
 codeGen fenv venv (VariableExprAST name) =
