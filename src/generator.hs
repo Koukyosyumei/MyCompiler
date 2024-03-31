@@ -55,58 +55,58 @@ codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
 
 codeGen fenv venv (NumberExprAST val) = (LCODE (show val), fenv, venv)
 
-codeGen fenv namedValue (VariableExprAST name) =
-    case (lookup name namedValue) of
-        Just (ACT val) -> (LCODE ("i32 " ++ (show val)), fenv, namedValue)
-        Just (SYM sym) -> (LCODE sym, fenv, namedValue)
-        Just (PTR ptl) -> (LCODE ptl, fenv, namedValue)
-        Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, namedValue)
+codeGen fenv venv (VariableExprAST name) =
+    case (lookup name venv) of
+        Just (ACT val) -> (LCODE ("i32 " ++ (show val)), fenv, venv)
+        Just (SYM sym) -> (LCODE sym, fenv, venv)
+        Just (PTR ptl) -> (LCODE ptl, fenv, venv)
+        Nothing        -> (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, venv)
 
-codeGen funcTable namedValue (BinaryExprAST op lhs rhs) = fst (codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs))
+codeGen fenv venv (BinaryExprAST op lhs rhs) = fst (codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs))
 
-codeGen funcTable namedValue (CallExprAST fname argExprs) =
-    case (lookup fname funcTable) of
+codeGen fenv venv (CallExprAST fname argExprs) =
+    case (lookup fname fenv) of
         Just argNames -> if (length argNames /= length argExprs)
-                            then (ERROR "Incorrect # arguments passed", funcTable, namedValue)
+                            then (ERROR "Incorrect # arguments passed", fenv, venv)
                             else (codeAppendN intermediateCode (createCall fname evaluatedArgs resultVar),
-                                 new_funcTable, new_namedValue ++ [(resultVar, SYM resultVar)])
-        Nothing       -> (ERROR "Unknown functino referenced", funcTable, namedValue)
+                                 new_fenv, new_venv ++ [(resultVar, SYM resultVar)])
+        Nothing       -> (ERROR "Unknown functino referenced", fenv, venv)
     where
-        resultVar = generateNewVarName "%calltmp" namedValue
-        (new_funcTable, new_namedValue, intermediateCode, evaluatedArgs) = createArgs funcTable namedValue argExprs
+        resultVar = generateNewVarName "%calltmp" venv
+        (new_fenv, new_venv, intermediateCode, evaluatedArgs) = createArgs fenv venv argExprs
 
-codeGen funcTable namedValue (PrototypeAST fname argNames) =
+codeGen fenv venv (PrototypeAST fname argNames) =
     (LCODE ("define i32 " ++ ("@" ++ fname') ++ ("(" ++ (joinWithCommaStr argNames) ++ ")")),
-     funcTable ++ [(fname', argNames)],
-     addVarName argNames namedValue)
+     fenv ++ [(fname', argNames)],
+     addVarName argNames venv)
     where
         fname' = if fname == "" then "0" else fname
 
-codeGen funcTable namedValue (FunctionAST prototype body) =
+codeGen fenv venv (FunctionAST prototype body) =
     case _getCode prototypeCODE of
         LCODE p -> case _getCode bodyCODE of
                     LCODE b   -> if (length localVars) == 0
-                                    then (ERROR "A function should return a value.", newfuncTable, localVars)
+                                    then (ERROR "A function should return a value.", newfenv, localVars)
                                     else (LCODE (p ++ " {\n"
                                         ++ "entry:\n"
                                         ++ b ++ (fst retInstr)
                                         ++ "\n\tret i32 " ++ (snd retInstr)
                                         ++ "\n}\n"),
-                                        newfuncTable,
+                                        newfenv,
                                         localVars)
-                    ERROR msg -> (ERROR ("function body contains the following errors: " ++ msg), funcTable, namedValue)
-        ERROR msg -> (ERROR ("function declaration contains the following errors: " ++ msg), funcTable, namedValue)
+                    ERROR msg -> (ERROR ("function body contains the following errors: " ++ msg), fenv, venv)
+        ERROR msg -> (ERROR ("function declaration contains the following errors: " ++ msg), fenv, venv)
     where
-        prototypeCODE = codeGen funcTable namedValue prototype
-        newfuncTable  = _getFEnv prototypeCODE
-        bodyCODE      = codeGen newfuncTable (namedValue ++ (_getVEnv prototypeCODE)) body
+        prototypeCODE = codeGen fenv venv prototype
+        newfenv  = _getFEnv prototypeCODE
+        bodyCODE      = codeGen newfenv (venv ++ (_getVEnv prototypeCODE)) body
         localVars     = _getVEnv bodyCODE
-        retInstr      = _getVal ((snd . last) localVars) namedValue
+        retInstr      = _getVal ((snd . last) localVars) venv
 
-codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTable,
+codeGen fenv venv (IfExprAST condAST thenAST elseAST) = (code, fenv,
                                                                     (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
     where
-        condCode   = codeGen funcTable namedValue condAST
+        condCode   = codeGen fenv venv condAST
         branchCode = LCODE ("\n\tbr i1 " ++ (fst . last. _getVEnv) condCode ++ ", label %then, label %else\n")
         entryCode  = codeAppend (_getCode condCode) branchCode
 
@@ -133,17 +133,17 @@ codeGen funcTable namedValue (IfExprAST condAST thenAST elseAST) = (code, funcTa
 
         code       = codeAppends [entryCode, thenCode, elseCode, contCode]
 
-codeGen funcTable namedValue (BlockAST        []) = (LCODE "", funcTable, namedValue)
-codeGen funcTable namedValue (BlockAST (e:exprs)) = (codeAppendN (_getCode e_result) (_getCode exprs_result), _getFEnv exprs_result, _getVEnv exprs_result)
+codeGen fenv venv (BlockAST        []) = (LCODE "", fenv, venv)
+codeGen fenv venv (BlockAST (e:exprs)) = (codeAppendN (_getCode e_result) (_getCode exprs_result), _getFEnv exprs_result, _getVEnv exprs_result)
     where
-        e_result = codeGen funcTable namedValue (e)
+        e_result = codeGen fenv venv (e)
         exprs_result = codeGen (_getFEnv e_result) (_getVEnv e_result) (BlockAST exprs)
 
-codeGen funcTable namedValue ast = (errormsg, funcTable, namedValue)
+codeGen fenv venv ast = (errormsg, fenv, venv)
     where
         errormsg = ERROR ("Unexpected inputs for codeGen:\n" ++ 
-                            "\tfuncTable = " ++ (show funcTable) ++ 
-                            "\n\tnamedValue = " ++ (show namedValue) ++ 
+                            "\tfenv = " ++ (show fenv) ++ 
+                            "\n\tvenv = " ++ (show venv) ++ 
                             "\n\tast = " ++ (show ast) ++ "\n")
 
 generateNewVarName :: String -> VEnv -> String
@@ -206,56 +206,56 @@ createArgs ft nv (a:aexprs) = (n_ft, n_nv, codeAppendN a_intermediateCode n_inte
         (n_ft, n_nv, n_intermediateCode, n_evaluated) = createArgs (_getFEnv a_intermediate) (_getVEnv a_intermediate) aexprs
 
 codePrepStoreExpr:: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
-codePrepStoreExpr funcTable namedValue (BinaryExprAST '=' (VariableExprAST vname) rhs) =
-    case lookup vname namedValue of
-        Just _ -> ((LCODE "", funcTable, namedValue), "%" ++ vname)
-        Nothing -> ((LCODE ("\t%" ++ vname ++ " = alloca i32, align 4\n"), funcTable, namedValue ++ [(vname, PTR ("%" ++ vname))]), "%" ++ vname)
-codePrepStoreExpr funcTable namedValue _ = ((ERROR "The left term of `=` should be a variable name.", funcTable, namedValue), "")
+codePrepStoreExpr fenv venv (BinaryExprAST '=' (VariableExprAST vname) rhs) =
+    case lookup vname venv of
+        Just _ -> ((LCODE "", fenv, venv), "%" ++ vname)
+        Nothing -> ((LCODE ("\t%" ++ vname ++ " = alloca i32, align 4\n"), fenv, venv ++ [(vname, PTR ("%" ++ vname))]), "%" ++ vname)
+codePrepStoreExpr fenv venv _ = ((ERROR "The left term of `=` should be a variable name.", fenv, venv), "")
 
 codeGenBinaryExpr:: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
-codeGenBinaryExpr funcTable namedValue (BinaryExprAST op lhs rhs) =
+codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
     case op of
-        '+' -> ((codeAppend intermediateCode (fADD lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
-        '-' -> ((codeAppend intermediateCode (fSUB lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
-        '*' -> ((codeAppend intermediateCode (fMUL lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
-        '<' -> ((codeAppend intermediateCode (fCmpULT lterm rterm newVar), funcTable, namedValueLR ++ [(newVar, SYM newVar)]), newVar)
+        '+' -> ((codeAppend intermediateCode (fADD lterm rterm newVar), fenv, venvLR ++ [(newVar, SYM newVar)]), newVar)
+        '-' -> ((codeAppend intermediateCode (fSUB lterm rterm newVar), fenv, venvLR ++ [(newVar, SYM newVar)]), newVar)
+        '*' -> ((codeAppend intermediateCode (fMUL lterm rterm newVar), fenv, venvLR ++ [(newVar, SYM newVar)]), newVar)
+        '<' -> ((codeAppend intermediateCode (fCmpULT lterm rterm newVar), fenv, venvLR ++ [(newVar, SYM newVar)]), newVar)
         '=' -> ((codeAppends [(_getCode (fst prepStoreExpr)),
                                LCODE "\tstore i32 ", rterm,
-                               LCODE (", i32* " ++ (snd prepStoreExpr) ++ ", align 4")], funcTable, _getVEnv (fst prepStoreExpr)),
+                               LCODE (", i32* " ++ (snd prepStoreExpr) ++ ", align 4")], fenv, _getVEnv (fst prepStoreExpr)),
                                snd prepStoreExpr)
-        _ -> ((ERROR "invalid binary operator", funcTable, namedValueLR), newVar)
+        _ -> ((ERROR "invalid binary operator", fenv, venvLR), newVar)
     where
-        lbranch = codeGenBinaryExpr funcTable namedValue lhs
-        intermediateCodeL = if needIntermediateVar lhs namedValue then codeAppend (_getCode (fst lbranch)) (LCODE "\n") else LCODE ("")
-        lterm = if needIntermediateVar lhs namedValue then LCODE (snd lbranch) else _getCode (fst lbranch)
-        namedValueL = if needIntermediateVar lhs namedValue then namedValue ++ (_getVEnv (fst lbranch)) else namedValue
+        lbranch = codeGenBinaryExpr fenv venv lhs
+        intermediateCodeL = if needIntermediateVar lhs venv then codeAppend (_getCode (fst lbranch)) (LCODE "\n") else LCODE ("")
+        lterm = if needIntermediateVar lhs venv then LCODE (snd lbranch) else _getCode (fst lbranch)
+        venvL = if needIntermediateVar lhs venv then venv ++ (_getVEnv (fst lbranch)) else venv
 
-        rbranch = codeGenBinaryExpr funcTable namedValueL rhs
-        intermediateCodeR = if needIntermediateVar rhs namedValue then codeAppend (_getCode (fst rbranch)) (LCODE "\n") else LCODE ("")
-        rterm = if needIntermediateVar rhs namedValue then LCODE (snd rbranch) else _getCode (fst rbranch)
-        namedValueLR = if needIntermediateVar rhs namedValue then  namedValueL ++ (_getVEnv (fst rbranch)) else namedValueL
+        rbranch = codeGenBinaryExpr fenv venvL rhs
+        intermediateCodeR = if needIntermediateVar rhs venv then codeAppend (_getCode (fst rbranch)) (LCODE "\n") else LCODE ("")
+        rterm = if needIntermediateVar rhs venv then LCODE (snd rbranch) else _getCode (fst rbranch)
+        venvLR = if needIntermediateVar rhs venv then  venvL ++ (_getVEnv (fst rbranch)) else venvL
 
         newVar = case op of
-                        '+' -> generateNewVarName "%addtmp" namedValueLR
-                        '-' -> generateNewVarName "%subtmp" namedValueLR
-                        '*' -> generateNewVarName "%multmp" namedValueLR
-                        '<' -> generateNewVarName "%cmptmp" namedValueLR
+                        '+' -> generateNewVarName "%addtmp" venvLR
+                        '-' -> generateNewVarName "%subtmp" venvLR
+                        '*' -> generateNewVarName "%multmp" venvLR
+                        '<' -> generateNewVarName "%cmptmp" venvLR
         intermediateCode = codeAppend intermediateCodeL intermediateCodeR
 
-        prepStoreExpr = codePrepStoreExpr funcTable namedValue (BinaryExprAST op lhs rhs)
+        prepStoreExpr = codePrepStoreExpr fenv venv (BinaryExprAST op lhs rhs)
 
-codeGenBinaryExpr funcTable namedValue (CallExprAST fname argExprs) = (callResult, fst (last (_getVEnv callResult)))
+codeGenBinaryExpr fenv venv (CallExprAST fname argExprs) = (callResult, fst (last (_getVEnv callResult)))
     where
-        callResult = codeGen funcTable namedValue (CallExprAST fname argExprs)
+        callResult = codeGen fenv venv (CallExprAST fname argExprs)
 
-codeGenBinaryExpr funcTable namedValue (VariableExprAST x) =
-    case lookup x namedValue of 
-        Just (PTR ptr) -> ((LCODE ("\n\t" ++ v ++ " = load i32, i32* " ++ ptr ++ ", align 4"), funcTable, namedValue ++ [(v, SYM v)]), "")
+codeGenBinaryExpr fenv venv (VariableExprAST x) =
+    case lookup x venv of 
+        Just (PTR ptr) -> ((LCODE ("\t" ++ v ++ " = load i32, i32* " ++ ptr ++ ", align 4"), fenv, venv ++ [(v, SYM v)]), v)
             where
-                v = generateNewVarName ptr namedValue
-        _ -> (codeGen funcTable namedValue (VariableExprAST x), "")
+                v = generateNewVarName ptr venv
+        _ -> (codeGen fenv venv (VariableExprAST x), "")
 
-codeGenBinaryExpr funcTable namedValue exp = (codeGen funcTable namedValue exp, "")
+codeGenBinaryExpr fenv venv exp = (codeGen fenv venv exp, "")
 
 joinWithComma :: [Code] -> String
 joinWithComma []             = ""
