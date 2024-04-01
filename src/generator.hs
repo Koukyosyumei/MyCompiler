@@ -38,7 +38,7 @@ _getVal :: SInt -> VEnv -> (String, String)
 _getVal (ACT x) _ = ("", show x)
 _getVal (SYM x) _ = ("", x)
 _getVal (PTR x) venv =
-  ("\n\t" ++ v ++ " = load i32, i32* " ++ x ++ ", align 4", v)
+  ("\t" ++ v ++ " = load i32, i32* " ++ x ++ ", align 4", v)
   where
     v = generateNewVarName x venv -- Generate a new variable name to save the loaded value
 
@@ -145,7 +145,10 @@ codeGen fenv venv (FunctionAST prototype body) =
     newfenv = _getFEnv prototypeCODE
     bodyCODE = codeGen newfenv (venv ++ (_getVEnv prototypeCODE)) body
     localVars = _getVEnv bodyCODE
-    retInstr = _getVal ((snd . last) localVars) venv
+    retInstr_ = _getVal ((snd . last) localVars) venv
+    retInstr = case (fst retInstr_) of 
+                "" -> ("", snd retInstr_)
+                _ -> ("\n" ++ (fst retInstr_), snd retInstr_)
 codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
   (code, fenv, (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
   where
@@ -283,7 +286,11 @@ createArgs ft nv (a:aexprs) =
     (a_intermediateCode, a_evaluated) =
       case a of
         NumberExprAST num -> (LCODE "", LCODE (show num))
-        VariableExprAST vname -> (LCODE "", _getCode (codeGen ft nv a))
+        VariableExprAST vname -> case lookup vname nv of
+                                    Just (PTR ptr) -> (LCODE (fst load_ptr), LCODE (snd load_ptr))
+                                            where
+                                                load_ptr = _getVal (PTR ptr) nv
+                                    _ -> (LCODE "", _getCode (codeGen ft nv a))
         _ ->
           ( _getCode (a_intermediate)
           , LCODE (fst (last (_getVEnv a_intermediate))))
