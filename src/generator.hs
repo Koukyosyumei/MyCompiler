@@ -146,9 +146,10 @@ codeGen fenv venv (FunctionAST prototype body) =
     bodyCODE = codeGen newfenv (venv ++ (_getVEnv prototypeCODE)) body
     localVars = _getVEnv bodyCODE
     retInstr_ = _getVal ((snd . last) localVars) venv
-    retInstr = case (fst retInstr_) of 
-                "" -> ("", snd retInstr_)
-                _ -> ("\n" ++ (fst retInstr_), snd retInstr_)
+    retInstr =
+      case (fst retInstr_) of
+        "" -> ("", snd retInstr_)
+        _ -> ("\n" ++ (fst retInstr_), snd retInstr_)
 codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
   (code, fenv, (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
   where
@@ -286,11 +287,11 @@ createArgs ft nv (a:aexprs) =
     (a_intermediateCode, a_evaluated) =
       case a of
         NumberExprAST num -> (LCODE "", LCODE (show num))
-        VariableExprAST vname -> case lookup vname nv of
-                                    Just (PTR ptr) -> (LCODE (fst load_ptr), LCODE (snd load_ptr))
-                                            where
-                                                load_ptr = _getVal (PTR ptr) nv
-                                    _ -> (LCODE "", _getCode (codeGen ft nv a))
+        VariableExprAST vname ->
+          case lookup vname nv of
+            Just (PTR ptr) -> (LCODE (fst load_ptr), LCODE (snd load_ptr))
+              where load_ptr = _getVal (PTR ptr) nv
+            _ -> (LCODE "", _getCode (codeGen ft nv a))
         _ ->
           ( _getCode (a_intermediate)
           , LCODE (fst (last (_getVEnv a_intermediate))))
