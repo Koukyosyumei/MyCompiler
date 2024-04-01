@@ -1,6 +1,6 @@
-# Haleidoscope
+# MyCompilier
 
-This project implements a compiler that translates code from a simple language into LLVM IR.
+This project implements a compiler that translates code from a simple language into LLVM IR. This project is inspiered by [Kaleidoscope](https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html).
 
 What it does:
 
