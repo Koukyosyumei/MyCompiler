@@ -12,6 +12,8 @@ data Token
   | TokIF
   | TokTHEN
   | TokELSE
+  | TokFOR
+  | TokIN
   deriving (Eq, Show)
 
 -- | getTok - Return the next token from standard input
@@ -39,6 +41,8 @@ getAlpha s i =
     "if" -> (TokIF, snd alphaStr)
     "then" -> (TokTHEN, snd alphaStr)
     "else" -> (TokELSE, snd alphaStr)
+    "for" -> (TokFOR, snd alphaStr)
+    "in" -> (TokIN, snd alphaStr)
     identifier -> (TokIDENTIFIER identifier, snd alphaStr)
   where
     alphaStr = getAlphaStr s i
