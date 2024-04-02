@@ -9,7 +9,7 @@ data ExprAST
   | VariableExprAST String -- Stores a variable name
   | BinaryExprAST Char ExprAST ExprAST -- Binary operation (operator, left operand, right operand)
   | CallExprAST String [ExprAST] -- Function call (name, arguments)
-  | PrototypeAST String [String]  -- Function prototype (name, argument names)
+  | PrototypeAST String [String] -- Function prototype (name, argument names)
   | FunctionAST ExprAST ExprAST -- Function definition (prototype, body)
   | IfExprAST ExprAST ExprAST ExprAST -- Conditional expression (condition, then expr, else expr)
   | ForAST ExprAST ExprAST ExprAST ExprAST -- For loop (start, end, step, body)
@@ -101,8 +101,7 @@ parsePrimary s i =
     TokFOR -> parseForExpr s i
     _ ->
       ( Error
-          ("unknown token when parsing a primary expression: "
-             ++ show (curTok))
+          ("unknown token when parsing a primary expression: " ++ show (curTok))
       , length s)
   where
     curTok = getTok s i
@@ -237,7 +236,8 @@ parseIfExpr s i =
       if fst curThen /= TokTHEN
         then (Error ("expected `then`, but got " ++ show curThen), snd curThen)
         else if fst curElse /= TokELSE
-               then (Error ("expected `else`, but got " ++ show curElse), snd curElse)
+               then ( Error ("expected `else`, but got " ++ show curElse)
+                    , snd curElse)
                else ( IfExprAST (fst condExpr) (fst thenExpr) (fst elseExpr)
                     , snd elseExpr)
   where
@@ -250,28 +250,35 @@ parseIfExpr s i =
 
 -- forexpr ::= 'for' `(`expression; expression; expression`)` in (expression | block)
 parseForExpr :: String -> Int -> (ExprAST, Int)
-parseForExpr s i = (ForAST (fst startExpr) (fst endExpr) (fst stepExpr) (fst bodyExpr), snd bodyExpr)
-    where
-        curFor = getTok s i -- eat `for`
-        leftPar = getTok s (snd curFor) -- eat `(`
-        startExpr = if (fst leftPar) == (TokChar '(') 
-                        then parseExpression s (snd leftPar)
-                        else (Error ("expected `(`, but got " ++ show leftPar), snd leftPar)
-        startCollon = getTok s (snd startExpr) -- eat `;` 
-        endExpr = if (fst startCollon) == (TokChar ';')
-                        then parseExpression s (snd startCollon)
-                        else (Error ("expected `;`, but got " ++ show startCollon), snd startCollon)
-        endCollon = getTok s (snd endExpr)
-        stepExpr = if (fst endCollon) == (TokChar ';')
-                        then parseExpression s (snd endCollon)
-                        else (Error ("expected `;`, but got " ++ show endCollon), snd endCollon)
-        rightPar = getTok s (snd stepExpr)
-        tokIn = getTok s (snd rightPar)
-        bodyExpr = if (fst rightPar) == (TokChar ')') 
-                        then if (fst tokIn) == TokIN 
-                                then parseBlockOrExpression s (snd tokIn)
-                                else (Error ("expected `in`, but got " ++ show tokIn), snd tokIn)
-                        else (Error ("expected `)`, but got " ++ show rightPar), snd rightPar)
+parseForExpr s i =
+  ( ForAST (fst startExpr) (fst endExpr) (fst stepExpr) (fst bodyExpr)
+  , snd bodyExpr)
+  where
+    curFor = getTok s i -- eat `for`
+    leftPar = getTok s (snd curFor) -- eat `(`
+    startExpr =
+      if (fst leftPar) == (TokChar '(')
+        then parseExpression s (snd leftPar)
+        else (Error ("expected `(`, but got " ++ show leftPar), snd leftPar)
+    startCollon = getTok s (snd startExpr) -- eat `;` 
+    endExpr =
+      if (fst startCollon) == (TokChar ';')
+        then parseExpression s (snd startCollon)
+        else ( Error ("expected `;`, but got " ++ show startCollon)
+             , snd startCollon)
+    endCollon = getTok s (snd endExpr)
+    stepExpr =
+      if (fst endCollon) == (TokChar ';')
+        then parseExpression s (snd endCollon)
+        else (Error ("expected `;`, but got " ++ show endCollon), snd endCollon)
+    rightPar = getTok s (snd stepExpr)
+    tokIn = getTok s (snd rightPar)
+    bodyExpr =
+      if (fst rightPar) == (TokChar ')')
+        then if (fst tokIn) == TokIN
+               then parseBlockOrExpression s (snd tokIn)
+               else (Error ("expected `in`, but got " ++ show tokIn), snd tokIn)
+        else (Error ("expected `)`, but got " ++ show rightPar), snd rightPar)
 
 -- topLevelexpr
 parseTopLevelExpr :: String -> Int -> (ExprAST, Int)

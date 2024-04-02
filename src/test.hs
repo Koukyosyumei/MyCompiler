@@ -28,12 +28,31 @@ main = do
     -- check "test2-2" (fst resultDigit2) (TokNUMBER 0.123)
   let source0 = "1+3; 2*3; } "
       sb0 = searchBlock source0 0 []
-  check "test-block" sb0 ([BinaryExprAST '+' (NumberExprAST 1) (NumberExprAST 3),BinaryExprAST '*' (NumberExprAST 2) (NumberExprAST 3)],12)
- 
+  check
+    "test-block"
+    sb0
+    ( [ BinaryExprAST '+' (NumberExprAST 1) (NumberExprAST 3)
+      , BinaryExprAST '*' (NumberExprAST 2) (NumberExprAST 3)
+      ]
+    , 12)
   let for0 = "def main() {for (a=1; a<2; a=a+1) in b=2;}"
       topfor0 = parseTop for0 0 []
-  check "test-for" topfor0 [FunctionAST (PrototypeAST "main" []) (BlockAST [ForAST (BinaryExprAST '=' (VariableExprAST "a") (NumberExprAST 1)) (BinaryExprAST '<' (VariableExprAST "a") (NumberExprAST 2)) (BinaryExprAST '=' (VariableExprAST "a") (BinaryExprAST '+' (VariableExprAST "a") (NumberExprAST 1))) (BinaryExprAST '=' (VariableExprAST "b") (NumberExprAST 2))])]
-
+  check
+    "test-for"
+    topfor0
+    [ FunctionAST
+        (PrototypeAST "main" [])
+        (BlockAST
+           [ ForAST
+               (BinaryExprAST '=' (VariableExprAST "a") (NumberExprAST 1))
+               (BinaryExprAST '<' (VariableExprAST "a") (NumberExprAST 2))
+               (BinaryExprAST
+                  '='
+                  (VariableExprAST "a")
+                  (BinaryExprAST '+' (VariableExprAST "a") (NumberExprAST 1)))
+               (BinaryExprAST '=' (VariableExprAST "b") (NumberExprAST 2))
+           ])
+    ]
   let source1 = "def foo(x y) x+foo(y, 4);"
       top1 = parseTop source1 0 []
   check
