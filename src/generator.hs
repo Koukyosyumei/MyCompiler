@@ -335,7 +335,8 @@ codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
       , newVar)
     '=' ->
       ( ( codeAppends
-            [ (_getCode (fst prepStoreExpr))
+            [ intermediateCodeR
+            , (_getCode (fst prepStoreExpr))
             , LCODE "\tstore i32 "
             , rterm
             , LCODE (", i32* " ++ (snd prepStoreExpr) ++ ", align 4")
