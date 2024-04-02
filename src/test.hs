@@ -5,8 +5,8 @@ import Parser
 check :: (Eq a, Show a) => String -> a -> a -> IO ()
 check s c v = do
   if c == v
-    then putStrLn $ s ++ ": OK"
-    else putStrLn $ s ++ ": NG\na = " ++ show c ++ "\nb = " ++ show v
+    then putStrLn $ s ++ ": \ESC[32mOK\ESC[0m"
+    else putStrLn $ s ++ ": \ESC[31mNG\ESC[0m\na = " ++ show c ++ "\nb = " ++ show v
 
 code2str :: Code -> String
 code2str (LCODE code) = code
@@ -35,6 +35,10 @@ main = do
       , BinaryExprAST '*' (NumberExprAST 2) (NumberExprAST 3)
       ]
     , 12)
+  let selfassign0 = "def main() {a=2; a=a+5;}"
+      sa0 = parseTop selfassign0 0 []
+      codesa0 = codeGen [] [] (sa0 !! 0)
+  check "test-selfassign" (code2str (_getCode codesa0)) "define i32 @main() {\nentry:\n\t%a = alloca i32, align 4\n\tstore i32 2, i32* %a, align 4\n\t%a1 = load i32, i32* %a, align 4\n\t%addtmp0 = add i32 %a1, 5\n\tstore i32 %addtmp0, i32* %a, align 4\n\t%a0 = load i32, i32* %a, align 4\n\tret i32 %a0\n}\n"
   let for0 = "def main() {for (a=1; a<2; a=a+1) in b=2;}"
       topfor0 = parseTop for0 0 []
   check
