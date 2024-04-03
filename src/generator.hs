@@ -193,6 +193,61 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
         , LCODE (", %else ]")
         ]
     code = codeAppends [entryCode, thenCode, elseCode, contCode]
+codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
+  ( codeAppends [entrySection, loopSection, bodySection, exitSection]
+  , fenv
+  , (_getVEnv stepCode) ++ [last venv])
+  where
+    startCode = codeGen fenv venv startAST
+    counterVar = fst (last (_getVEnv startCode))
+    entrySection =
+      codeAppends
+        [ (_getCode startCode)
+        , LCODE
+            ("\n\t%index.start = load i32, i32* %" ++ counterVar ++ ", align 4")
+        , LCODE ("\n\tbr label %loop\n")
+        ]
+    endCode =
+      codeGen
+        fenv
+        ((_getVEnv startCode) ++ [("index", SYM "%index")])
+        (replaceVarName endAST counterVar "index")
+    loopSection =
+      codeAppends
+        [ LCODE "loop:\n"
+        , LCODE
+            ("\t%index = phi i32 [ "
+               ++ "%index.start"
+               ++ ", %entry ], [ %next_index, %body ]\n")
+        , (_getCode endCode)
+        , LCODE
+            ("\n\tbr i1 "
+               ++ ((fst . last . _getVEnv) endCode)
+               ++ ", label %body, label %exit\n")
+        ]
+    bodyCode =
+      codeGen
+        fenv
+        (_getVEnv endCode)
+        (replaceVarName bodyAST counterVar "index")
+    stepCode =
+      codeGen
+        fenv
+        (_getVEnv bodyCode)
+        (replaceVarName stepAST counterVar "index")
+    bodySection =
+      codeAppends
+        [ LCODE ("body:\n")
+        , (_getCode bodyCode)
+        , LCODE "\n"
+        , (_getCode stepCode)
+        , LCODE
+            ("\n\t%next_index = add i32 "
+               ++ ((fst . last . _getVEnv) stepCode)
+               ++ ", 0")
+        , LCODE "\n\tbr label %loop\n"
+        ]
+    exitSection = LCODE "exit:"
 codeGen fenv venv (BlockAST []) = (LCODE "", fenv, venv)
 codeGen fenv venv (BlockAST (e:exprs)) =
   ( codeAppendN (_getCode e_result) (_getCode exprs_result)
@@ -214,6 +269,34 @@ codeGen fenv venv ast = (errormsg, fenv, venv)
            ++ "\n\tast = "
            ++ (show ast)
            ++ "\n")
+
+replaceVarName :: ExprAST -> String -> String -> ExprAST
+replaceVarName expr a b =
+  case expr of
+    NumberExprAST n -> NumberExprAST n
+    VariableExprAST s ->
+      if s == a
+        then VariableExprAST b
+        else VariableExprAST s
+    BinaryExprAST op left right ->
+      BinaryExprAST op (replaceVarName left a b) (replaceVarName right a b)
+    CallExprAST name exprs ->
+      CallExprAST name (map (\e -> replaceVarName e a b) exprs)
+    FunctionAST proto body ->
+      FunctionAST (replaceVarName proto a b) (replaceVarName body a b)
+    IfExprAST cond els thn ->
+      IfExprAST
+        (replaceVarName cond a b)
+        (replaceVarName els a b)
+        (replaceVarName thn a b)
+    ForAST start end step body ->
+      ForAST
+        (replaceVarName start a b)
+        (replaceVarName end a b)
+        (replaceVarName step a b)
+        (replaceVarName body a b)
+    BlockAST exprs -> BlockAST (map (\e -> replaceVarName e a b) exprs)
+    x -> x
 
 generateNewVarName :: String -> VEnv -> String
 generateNewVarName w venv = generateNewVarName' w 0 venv
@@ -342,7 +425,7 @@ codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
             , LCODE (", i32* " ++ (snd prepStoreExpr) ++ ", align 4")
             ]
         , fenv
-        , _getVEnv (fst prepStoreExpr))
+        , (_getVEnv (fst prepStoreExpr)))
       , snd prepStoreExpr)
     _ -> ((ERROR "invalid binary operator", fenv, venvLR), newVar)
   where
@@ -379,7 +462,13 @@ codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
         '*' -> generateNewVarName "%multmp" venvLR
         '<' -> generateNewVarName "%cmptmp" venvLR
     intermediateCode = codeAppend intermediateCodeL intermediateCodeR
-    prepStoreExpr = codePrepStoreExpr fenv venv (BinaryExprAST op lhs rhs)
+    rvenv = _getVEnv (fst rbranch)
+    rvenv_last =
+      if (length rvenv) == 0
+        then []
+        else [last rvenv]
+    prepStoreExpr =
+      codePrepStoreExpr fenv (rvenv_last ++ venv) (BinaryExprAST op lhs rhs)
 codeGenBinaryExpr fenv venv (CallExprAST fname argExprs) =
   (callResult, fst (last (_getVEnv callResult)))
   where
