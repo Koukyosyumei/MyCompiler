@@ -62,7 +62,7 @@ main = do
                (BinaryExprAST '=' (VariableExprAST "b") (NumberExprAST 2))
            ])
     ]
-  putStrLn (show codefor0)
+  -- putStrLn (show codefor0)
   let source1 = "def foo(x y) x+foo(y, 4);"
       top1 = parseTop source1 0 []
   check

@@ -196,7 +196,7 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
 codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
   ( codeAppends [entrySection, loopSection, bodySection, exitSection]
   , fenv
-  , (_getVEnv stepCode) ++ [last venv])
+  , (_getVEnv stepCode) ++ (if (length venv) == 0 then [] else [last venv]))
   where
     startCode = codeGen fenv venv startAST
     counterVar = fst (last (_getVEnv startCode))
