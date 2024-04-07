@@ -144,4 +144,4 @@ main = do
   check
     "test-Fib-IR"
     (code2str (_getCode code5))
-    "define i32 @fib(i32 %x) {\nentry:\n\t%cmptmp0 = icmp ult i32 %x, 3\n\tbr i1 %cmptmp0, label %then, label %else\n\nthen:\n\tbr label %ifcont\n\nelse:\n\t%subtmp0 = sub i32 %x, 1\n\t%calltmp0 = call i32 @fib(i32 %subtmp0)\n\t%subtmp1 = sub i32 %x, 2\n\t%calltmp1 = call i32 @fib(i32 %subtmp1)\n\t%addtmp0 = add i32 %calltmp0, %calltmp1\n\tbr label %ifcont\n\nifcont:\n\t%iftmp = phi i32 [ 1, %then ], [ %addtmp0, %else ]\n\tret i32 %iftmp\n}\n"
+    "define i32 @fib(i32 %x) {\nentry:\n\t%cmptmp0 = icmp ult i32 %x, 3\n\tbr i1 %cmptmp0, label %then0, label %else0\n\nthen0:\n\tbr label %ifcont0\n\nelse0:\n\t%subtmp0 = sub i32 %x, 1\n\t%calltmp0 = call i32 @fib(i32 %subtmp0)\n\t%subtmp1 = sub i32 %x, 2\n\t%calltmp1 = call i32 @fib(i32 %subtmp1)\n\t%addtmp0 = add i32 %calltmp0, %calltmp1\n\tbr label %ifcont0\n\nifcont0:\n\t%iftmp0 = phi i32 [ 1, %then0 ], [ %addtmp0, %else0 ]\n\tret i32 %iftmp0\n}\n"

@@ -1,16 +1,16 @@
 define i32 @main() {
 entry:
 	%cmptmp0 = icmp ult i32 4, 3
-	br i1 %cmptmp0, label %then, label %else
+	br i1 %cmptmp0, label %then0, label %else0
 
-then:
-	br label %ifcont
+then0:
+	br label %ifcont0
 
-else:
-	br label %ifcont
+else0:
+	br label %ifcont0
 
-ifcont:
-	%iftmp = phi i32 [ 12, %then ], [ 13, %else ]
-	ret i32 %iftmp
+ifcont0:
+	%iftmp0 = phi i32 [ 12, %then0 ], [ 13, %else0 ]
+	ret i32 %iftmp0
 }
 

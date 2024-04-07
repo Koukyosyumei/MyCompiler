@@ -151,14 +151,28 @@ codeGen fenv venv (FunctionAST prototype body) =
         "" -> ("", snd retInstr_)
         _ -> ("\n" ++ (fst retInstr_), snd retInstr_)
 codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
-  (code, fenv, (_getVEnv elseBranch) ++ [("%iftmp", SYM "%iftmp")])
+  ( code
+  , fenv
+  , ([ (label_then, SYM label_then)
+     , (label_else, SYM label_else)
+     , (label_ifcont, SYM label_ifcont)
+     ]
+       ++ _getVEnv elseBranch)
+      ++ [(iftmp, SYM iftmp)])
   where
+    label_then = generateNewVarName "then" venv
+    label_else = generateNewVarName "else" venv
+    label_ifcont = generateNewVarName "ifcont" venv
     condCode = codeGen fenv venv condAST
     branchCode =
       LCODE
         ("\n\tbr i1 "
            ++ (fst . last . _getVEnv) condCode
-           ++ ", label %then, label %else\n")
+           ++ ", label %"
+           ++ label_then
+           ++ ", label %"
+           ++ label_else
+           ++ "\n")
     entryCode = codeAppend (_getCode condCode) branchCode
     thenBranch = codeGen (_getFEnv condCode) (_getVEnv condCode) thenAST
     thenBody =
@@ -171,7 +185,10 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
         _ -> LCODE ((fst . last . _getVEnv) thenBranch)
     thenCode =
       codeAppends
-        [LCODE ("\nthen:"), thenBody, LCODE ("\n\tbr label %ifcont\n")]
+        [ LCODE ("\n" ++ label_then ++ ":")
+        , thenBody
+        , LCODE ("\n\tbr label %" ++ label_ifcont ++ "\n")
+        ]
     elseBranch = codeGen (_getFEnv thenBranch) (_getVEnv thenBranch) elseAST
     elseBody =
       case elseAST of
@@ -183,71 +200,106 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
         _ -> LCODE ((fst . last . _getVEnv) elseBranch)
     elseCode =
       codeAppends
-        [LCODE ("\nelse:"), elseBody, LCODE ("\n\tbr label %ifcont\n")]
+        [ LCODE ("\n" ++ label_else ++ ":")
+        , elseBody
+        , LCODE ("\n\tbr label %" ++ label_ifcont ++ "\n")
+        ]
+    iftmp = generateNewVarName "%iftmp" (_getVEnv elseBranch)
     contCode =
       codeAppends
-        [ LCODE ("\nifcont:\n\t%iftmp = phi i32 [ ")
+        [ LCODE ("\n" ++ label_ifcont ++ ":\n\t" ++ iftmp ++ " = phi i32 [ ")
         , thenRes
-        , LCODE (", %then ], [ ")
+        , LCODE (", %" ++ label_then ++ " ], [ ")
         , elseRes
-        , LCODE (", %else ]")
+        , LCODE (", %" ++ label_else ++ " ]")
         ]
     code = codeAppends [entryCode, thenCode, elseCode, contCode]
 codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
   ( codeAppends [entrySection, loopSection, bodySection, exitSection]
   , fenv
-  , (_getVEnv stepCode) ++ (if (length venv) == 0 then [] else [last venv]))
+  , ([ (label_loop, SYM label_loop)
+     , (label_initialindex, SYM label_initialindex)
+     , (label_nextindex, SYM label_nextindex)
+     , (label_body, SYM label_body)
+     , (label_exit_loop, SYM label_exit_loop)
+     ]
+       ++ _getVEnv stepCode)
+      ++ (if (length venv) == 0
+            then []
+            else [last venv]))
   where
+    label_loop = generateNewVarName "loop" venv
+    label_initialindex = generateNewVarName "initial_index" venv
+    label_index = generateNewVarName "index" venv
+    label_nextindex = generateNewVarName "next_index" venv
+    label_body = generateNewVarName "body" venv
+    label_exit_loop = generateNewVarName "exit_loop" venv
+
     startCode = codeGen fenv venv startAST
     counterVar = fst (last (_getVEnv startCode))
     entrySection =
       codeAppends
         [ (_getCode startCode)
         , LCODE
-            ("\n\t%index.start = load i32, i32* %" ++ counterVar ++ ", align 4")
-        , LCODE ("\n\tbr label %loop\n")
+            ("\n\t%"
+               ++ label_initialindex
+               ++ " = load i32, i32* %"
+               ++ counterVar
+               ++ ", align 4")
+        , LCODE ("\n\tbr label %" ++ label_loop ++ "\n")
         ]
     endCode =
       codeGen
         fenv
-        ((_getVEnv startCode) ++ [("index", SYM "%index")])
-        (replaceVarName endAST counterVar "index")
+        ((_getVEnv startCode) ++ [(label_index, SYM ("%" ++ label_index))])
+        (replaceVarName endAST counterVar label_index)
     loopSection =
       codeAppends
-        [ LCODE "loop:\n"
+        [ LCODE (label_loop ++ ":\n")
         , LCODE
-            ("\t%index = phi i32 [ "
-               ++ "%index.start"
-               ++ ", %entry ], [ %next_index, %body ]\n")
+            ("\t%"
+               ++ label_index
+               ++ " = phi i32 [ "
+               ++ "%"
+               ++ label_initialindex
+               ++ ", %entry ], [ %"
+               ++ label_nextindex
+               ++ ", %"
+               ++ label_body
+               ++ " ]\n")
         , (_getCode endCode)
         , LCODE
             ("\n\tbr i1 "
                ++ ((fst . last . _getVEnv) endCode)
-               ++ ", label %body, label %exit\n")
+               ++ ", label %"
+               ++ label_body
+               ++ ", label %" ++ label_exit_loop ++ "\n")
         ]
     bodyCode =
       codeGen
         fenv
         (_getVEnv endCode)
-        (replaceVarName bodyAST counterVar "index")
+        (replaceVarName bodyAST counterVar label_index)
     stepCode =
       codeGen
         fenv
         (_getVEnv bodyCode)
-        (replaceVarName stepAST counterVar "index")
+        (replaceVarName stepAST counterVar label_index)
     bodySection =
       codeAppends
-        [ LCODE ("body:\n")
+        [ LCODE (label_body ++ ":\n")
         , (_getCode bodyCode)
         , LCODE "\n"
         , (_getCode stepCode)
         , LCODE
-            ("\n\t%next_index = add i32 "
+            ("\n\t%"
+               ++ label_nextindex
+               ++ " = add i32 "
                ++ ((fst . last . _getVEnv) stepCode)
                ++ ", 0")
-        , LCODE "\n\tbr label %loop\n"
+        , LCODE ("\n\tbr label %" ++ label_loop ++ "\n")
         ]
-    exitSection = LCODE "exit:"
+    exitSection = LCODE (label_exit_loop ++ ":")
 codeGen fenv venv (BlockAST []) = (LCODE "", fenv, venv)
 codeGen fenv venv (BlockAST (e:exprs)) =
   ( codeAppendN (_getCode e_result) (_getCode exprs_result)
