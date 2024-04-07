@@ -19,3 +19,9 @@ This folder provides some LLVM-IR codes generated from Haleidoscope.
 ```bash
 ./build/hal "def main() {s=0; for (a=1; a<5; a+1) in s=s+2;}"
 ```
+
+- [/example/multifor.ll](/example/multifor.ll)
+
+```bash
+./build/hal "def main() {s=0; t=1; for (a=1; a<5; a+1) in s=s+3; for (b=1; b<5; b+1) in t=t+2; s+t}"
+```
