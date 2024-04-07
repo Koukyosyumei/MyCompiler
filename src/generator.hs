@@ -21,17 +21,23 @@ type FEnv = [(String, [String])]
 -- Type alias for variable environment (variable name -> symbolic value)
 type VEnv = [(String, SInt)]
 
--- Function to extract code from a combined result (code, function env, variable env)
-_getCode :: (Code, FEnv, VEnv) -> Code
-_getCode (a, b, c) = a
+-- Type alias for block environment (block type -> latest name)
+type BEnv = [(String, SInt)]
+
+-- Function to extract code from a combined result (code, function env, variable env, block env)
+_getCode :: (Code, FEnv, VEnv, BEnv) -> Code
+_getCode (a, b, c, d) = a
 
 -- Function to extract function environment from a combined result
-_getFEnv :: (Code, FEnv, VEnv) -> FEnv
-_getFEnv (a, b, c) = b
+_getFEnv :: (Code, FEnv, VEnv, BEnv) -> FEnv
+_getFEnv (a, b, c, d) = b
 
 -- Function to extract variable environment from a combined result
-_getVEnv :: (Code, FEnv, VEnv) -> VEnv
-_getVEnv (a, b, c) = c
+_getVEnv :: (Code, FEnv, VEnv, BEnv) -> VEnv
+_getVEnv (a, b, c, d) = c
+
+_getBEnv :: (Code, FEnv, VEnv, BEnv) -> BEnv
+_getBEnv (a, b, c, d) = d
 
 -- Function to get the actual value from a symbolic representation (variable name or pointer)
 _getVal :: SInt -> VEnv -> (String, String)
@@ -63,64 +69,76 @@ isBinaryExpr (BinaryExprAST _ _ _) = True
 isBinaryExpr _ = False
 
 -- Main function for code generation
-codeGens :: FEnv -> VEnv -> [ExprAST] -> (Code, FEnv, VEnv)
-codeGens fenv venv es = codeGens_ fenv venv es (LCODE "")
+codeGens :: [ExprAST] -> (Code, FEnv, VEnv, BEnv)
+codeGens es = codeGens_ [] [] [] es (LCODE "")
 
 -- Helper function for recursive code generation
-codeGens_ :: FEnv -> VEnv -> [ExprAST] -> Code -> (Code, FEnv, VEnv)
-codeGens_ fenv venv [] code = (code, fenv, venv)
-codeGens_ fenv venv (e:es) code =
-  codeGens_ (_getFEnv e_result) (_getVEnv e_result) es new_code
+codeGens_ ::
+     FEnv -> VEnv -> BEnv -> [ExprAST] -> Code -> (Code, FEnv, VEnv, BEnv)
+codeGens_ fenv venv benv [] code = (code, fenv, venv, benv)
+codeGens_ fenv venv benv (e:es) code =
+  codeGens_
+    (_getFEnv e_result)
+    (_getVEnv e_result)
+    (_getBEnv e_result)
+    es
+    new_code
   where
-    e_result = codeGen fenv venv e
+    e_result = codeGen fenv venv benv e
     new_code = codeAppend code (_getCode e_result)
 
 -- Function to generate code for a single expression
-codeGen :: FEnv -> VEnv -> ExprAST -> (Code, FEnv, VEnv)
-codeGen fenv venv (NumberExprAST val) = (LCODE (show val), fenv, venv)
-codeGen fenv venv (VariableExprAST name) =
+codeGen :: FEnv -> VEnv -> BEnv -> ExprAST -> (Code, FEnv, VEnv, BEnv)
+codeGen fenv venv benv (NumberExprAST val) =
+  (LCODE (show val), fenv, venv, benv)
+codeGen fenv venv benv (VariableExprAST name) =
   case (lookup name venv) of
-    Just (ACT val) -> (LCODE ("i32 " ++ (show val)), fenv, venv)
-    Just (SYM sym) -> (LCODE sym, fenv, venv)
-    Just (PTR ptl) -> (LCODE ptl, fenv, venv)
+    Just (ACT val) -> (LCODE ("i32 " ++ (show val)), fenv, venv, benv)
+    Just (SYM sym) -> (LCODE sym, fenv, venv, benv)
+    Just (PTR ptl) -> (LCODE ptl, fenv, venv, benv)
     Nothing ->
-      (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, venv)
-codeGen fenv venv (BinaryExprAST op lhs rhs) =
-  fst (codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs))
-codeGen fenv venv (CallExprAST fname argExprs) =
+      (ERROR ("Unknown variable name: name=" ++ name ++ "\n"), fenv, venv, benv)
+codeGen fenv venv benv (BinaryExprAST op lhs rhs) =
+  fst (codeGenBinaryExpr fenv venv benv (BinaryExprAST op lhs rhs))
+codeGen fenv venv benv (CallExprAST fname argExprs) =
   case (lookup fname fenv) of
     Just argNames ->
       if (length argNames /= length argExprs)
-        then (ERROR "Incorrect # arguments passed", fenv, venv)
+        then (ERROR "Incorrect # arguments passed", fenv, venv, benv)
         else ( codeAppendN
                  intermediateCode
                  (createCall fname evaluatedArgs resultVar)
              , new_fenv
-             , new_venv ++ [(resultVar, SYM resultVar)])
-    Nothing -> (ERROR "Unknown functino referenced", fenv, venv)
+             , new_venv ++ [(resultVar, SYM resultVar)]
+             , benv)
+    Nothing -> (ERROR "Unknown functino referenced", fenv, venv, benv)
   where
     resultVar = generateNewVarName "%calltmp" venv
     (new_fenv, new_venv, intermediateCode, evaluatedArgs) =
-      createArgs fenv venv argExprs
-codeGen fenv venv (PrototypeAST fname argNames) =
+      createArgs fenv venv benv argExprs
+codeGen fenv venv benv (PrototypeAST fname argNames) =
   ( LCODE
       ("define i32 "
          ++ ("@" ++ fname')
          ++ ("(" ++ (joinWithCommaStr argNames) ++ ")"))
   , fenv ++ [(fname', argNames)]
-  , addVarName argNames venv)
+  , addVarName argNames venv
+  , benv)
   where
     fname' =
       if fname == ""
         then "0"
         else fname
-codeGen fenv venv (FunctionAST prototype body) =
+codeGen fenv venv benv (FunctionAST prototype body) =
   case _getCode prototypeCODE of
     LCODE p ->
       case _getCode bodyCODE of
         LCODE b ->
           if (length localVars) == 0
-            then (ERROR "A function should return a value.", newfenv, localVars)
+            then ( ERROR "A function should return a value."
+                 , newfenv
+                 , localVars
+                 , benv)
             else ( LCODE
                      (p
                         ++ " {\n"
@@ -131,39 +149,47 @@ codeGen fenv venv (FunctionAST prototype body) =
                         ++ (snd retInstr)
                         ++ "\n}\n")
                  , newfenv
-                 , localVars)
+                 , localVars
+                 , (_getBEnv bodyCODE))
         ERROR msg ->
           ( ERROR ("function body contains the following errors: " ++ msg)
           , fenv
-          , venv)
+          , venv
+          , benv)
     ERROR msg ->
       ( ERROR ("function declaration contains the following errors: " ++ msg)
       , fenv
-      , venv)
+      , venv
+      , benv)
   where
-    prototypeCODE = codeGen fenv venv prototype
+    prototypeCODE = codeGen fenv venv benv prototype
     newfenv = _getFEnv prototypeCODE
-    bodyCODE = codeGen newfenv (venv ++ (_getVEnv prototypeCODE)) body
+    bodyCODE =
+      codeGen
+        newfenv
+        (venv ++ (_getVEnv prototypeCODE))
+        (benv ++ [("entry", SYM "entry")])
+        body
     localVars = _getVEnv bodyCODE
     retInstr_ = _getVal ((snd . last) localVars) venv
     retInstr =
       case (fst retInstr_) of
         "" -> ("", snd retInstr_)
         _ -> ("\n" ++ (fst retInstr_), snd retInstr_)
-codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
+codeGen fenv venv benv (IfExprAST condAST thenAST elseAST) =
   ( code
   , fenv
-  , ([ (label_then, SYM label_then)
-     , (label_else, SYM label_else)
-     , (label_ifcont, SYM label_ifcont)
-     ]
-       ++ _getVEnv elseBranch)
-      ++ [(iftmp, SYM iftmp)])
+  , (_getVEnv elseBranch) ++ [(iftmp, SYM iftmp)]
+  , (_getBEnv elseBranch)
+      ++ [ (label_then, SYM label_then)
+         , (label_else, SYM label_else)
+         , (label_ifcont, SYM label_ifcont)
+         ])
   where
-    label_then = generateNewVarName "then" venv
-    label_else = generateNewVarName "else" venv
-    label_ifcont = generateNewVarName "ifcont" venv
-    condCode = codeGen fenv venv condAST
+    label_then = generateNewBlockName "then" benv
+    label_else = generateNewBlockName "else" benv
+    label_ifcont = generateNewBlockName "ifcont" benv
+    condCode = codeGen fenv venv benv condAST
     branchCode =
       LCODE
         ("\n\tbr i1 "
@@ -174,7 +200,12 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
            ++ label_else
            ++ "\n")
     entryCode = codeAppend (_getCode condCode) branchCode
-    thenBranch = codeGen (_getFEnv condCode) (_getVEnv condCode) thenAST
+    thenBranch =
+      codeGen
+        (_getFEnv condCode)
+        (_getVEnv condCode)
+        (_getBEnv condCode)
+        thenAST
     thenBody =
       case thenAST of
         NumberExprAST x -> LCODE ("")
@@ -189,7 +220,12 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
         , thenBody
         , LCODE ("\n\tbr label %" ++ label_ifcont ++ "\n")
         ]
-    elseBranch = codeGen (_getFEnv thenBranch) (_getVEnv thenBranch) elseAST
+    elseBranch =
+      codeGen
+        (_getFEnv thenBranch)
+        (_getVEnv thenBranch)
+        (_getBEnv thenBranch)
+        elseAST
     elseBody =
       case elseAST of
         NumberExprAST x -> LCODE ("")
@@ -214,28 +250,29 @@ codeGen fenv venv (IfExprAST condAST thenAST elseAST) =
         , LCODE (", %" ++ label_else ++ " ]")
         ]
     code = codeAppends [entryCode, thenCode, elseCode, contCode]
-codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
+codeGen fenv venv benv (ForAST startAST endAST stepAST bodyAST) =
   ( codeAppends [entrySection, loopSection, bodySection, exitSection]
   , fenv
-  , ([ (label_loop, SYM label_loop)
-     , (label_initialindex, SYM label_initialindex)
-     , (label_nextindex, SYM label_nextindex)
-     , (label_body, SYM label_body)
-     , (label_exit_loop, SYM label_exit_loop)
-     ]
-       ++ _getVEnv stepCode)
+  , [ (label_initialindex, SYM label_initialindex)
+    , (label_nextindex, SYM label_nextindex)
+    ]
+      ++ (_getVEnv stepCode)
       ++ (if (length venv) == 0
             then []
-            else [last venv]))
+            else [last venv])
+  , (_getBEnv stepCode)
+      ++ [ (label_loop, SYM label_loop)
+         , (label_body, SYM label_body)
+         , (label_exit_loop, SYM label_exit_loop)
+         ])
   where
-    label_loop = generateNewVarName "loop" venv
+    label_loop = generateNewBlockName "loop" benv
+    label_body = generateNewBlockName "body" benv
+    label_exit_loop = generateNewBlockName "exit_loop" benv
     label_initialindex = generateNewVarName "initial_index" venv
     label_index = generateNewVarName "index" venv
     label_nextindex = generateNewVarName "next_index" venv
-    label_body = generateNewVarName "body" venv
-    label_exit_loop = generateNewVarName "exit_loop" venv
-
-    startCode = codeGen fenv venv startAST
+    startCode = codeGen fenv venv benv startAST
     counterVar = fst (last (_getVEnv startCode))
     entrySection =
       codeAppends
@@ -252,7 +289,9 @@ codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
       codeGen
         fenv
         ((_getVEnv startCode) ++ [(label_index, SYM ("%" ++ label_index))])
+        (_getBEnv startCode)
         (replaceVarName endAST counterVar label_index)
+    prev_entry = fst (last benv)
     loopSection =
       codeAppends
         [ LCODE (label_loop ++ ":\n")
@@ -262,7 +301,9 @@ codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
                ++ " = phi i32 [ "
                ++ "%"
                ++ label_initialindex
-               ++ ", %entry ], [ %"
+               ++ ", %"
+               ++ prev_entry
+               ++ " ], [ %"
                ++ label_nextindex
                ++ ", %"
                ++ label_body
@@ -273,17 +314,21 @@ codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
                ++ ((fst . last . _getVEnv) endCode)
                ++ ", label %"
                ++ label_body
-               ++ ", label %" ++ label_exit_loop ++ "\n")
+               ++ ", label %"
+               ++ label_exit_loop
+               ++ "\n")
         ]
     bodyCode =
       codeGen
         fenv
         (_getVEnv endCode)
+        (_getBEnv endCode)
         (replaceVarName bodyAST counterVar label_index)
     stepCode =
       codeGen
         fenv
         (_getVEnv bodyCode)
+        (_getBEnv bodyCode)
         (replaceVarName stepAST counterVar label_index)
     bodySection =
       codeAppends
@@ -300,16 +345,21 @@ codeGen fenv venv (ForAST startAST endAST stepAST bodyAST) =
         , LCODE ("\n\tbr label %" ++ label_loop ++ "\n")
         ]
     exitSection = LCODE (label_exit_loop ++ ":")
-codeGen fenv venv (BlockAST []) = (LCODE "", fenv, venv)
-codeGen fenv venv (BlockAST (e:exprs)) =
+codeGen fenv venv benv (BlockAST []) = (LCODE "", fenv, venv, benv)
+codeGen fenv venv benv (BlockAST (e:exprs)) =
   ( codeAppendN (_getCode e_result) (_getCode exprs_result)
   , _getFEnv exprs_result
-  , _getVEnv exprs_result)
+  , _getVEnv exprs_result
+  , _getBEnv exprs_result)
   where
-    e_result = codeGen fenv venv (e)
+    e_result = codeGen fenv venv benv e
     exprs_result =
-      codeGen (_getFEnv e_result) (_getVEnv e_result) (BlockAST exprs)
-codeGen fenv venv ast = (errormsg, fenv, venv)
+      codeGen
+        (_getFEnv e_result)
+        (_getVEnv e_result)
+        (_getBEnv e_result)
+        (BlockAST exprs)
+codeGen fenv venv benv ast = (errormsg, fenv, venv, benv)
   where
     errormsg =
       ERROR
@@ -355,6 +405,15 @@ generateNewVarName w venv = generateNewVarName' w 0 venv
 
 generateNewVarName' :: String -> Int -> VEnv -> String
 generateNewVarName' w i venv =
+  case (lookup (w ++ show i) venv) of
+    Just _ -> generateNewVarName' w (i + 1) venv
+    Nothing -> w ++ show i
+
+generateNewBlockName :: String -> BEnv -> String
+generateNewBlockName w benv = generateNewBlockName' w 0 benv
+
+generateNewBlockName' :: String -> Int -> VEnv -> String
+generateNewBlockName' w i venv =
   case (lookup (w ++ show i) venv) of
     Just _ -> generateNewVarName' w (i + 1) venv
     Nothing -> w ++ show i
@@ -410,15 +469,15 @@ codeAppendN (LCODE "") b = b
 codeAppendN a (LCODE "") = a
 codeAppendN (LCODE a) (LCODE b) = LCODE (a ++ "\n" ++ b)
 
-createArgs :: FEnv -> VEnv -> [ExprAST] -> (FEnv, VEnv, Code, [Code])
-createArgs ft nv [] = (ft, nv, LCODE "", [])
-createArgs ft nv (a:aexprs) =
+createArgs :: FEnv -> VEnv -> BEnv -> [ExprAST] -> (FEnv, VEnv, Code, [Code])
+createArgs ft nv bv [] = (ft, nv, LCODE "", [])
+createArgs ft nv bv (a:aexprs) =
   ( n_ft
   , n_nv
   , codeAppendN a_intermediateCode n_intermediateCode
   , [a_evaluated] ++ n_evaluated)
   where
-    a_intermediate = codeGen ft nv a
+    a_intermediate = codeGen ft nv bv a
     (a_intermediateCode, a_evaluated) =
       case a of
         NumberExprAST num -> (LCODE "", LCODE (show num))
@@ -426,47 +485,59 @@ createArgs ft nv (a:aexprs) =
           case lookup vname nv of
             Just (PTR ptr) -> (LCODE (fst load_ptr), LCODE (snd load_ptr))
               where load_ptr = _getVal (PTR ptr) nv
-            _ -> (LCODE "", _getCode (codeGen ft nv a))
+            _ -> (LCODE "", _getCode (codeGen ft nv bv a))
         _ ->
           ( _getCode (a_intermediate)
           , LCODE (fst (last (_getVEnv a_intermediate))))
     (n_ft, n_nv, n_intermediateCode, n_evaluated) =
-      createArgs (_getFEnv a_intermediate) (_getVEnv a_intermediate) aexprs
+      createArgs
+        (_getFEnv a_intermediate)
+        (_getVEnv a_intermediate)
+        (_getBEnv a_intermediate)
+        aexprs
 
-codePrepStoreExpr :: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
-codePrepStoreExpr fenv venv (BinaryExprAST '=' (VariableExprAST vname) rhs) =
+codePrepStoreExpr ::
+     FEnv -> VEnv -> BEnv -> ExprAST -> ((Code, FEnv, VEnv, BEnv), String)
+codePrepStoreExpr fenv venv benv (BinaryExprAST '=' (VariableExprAST vname) rhs) =
   case lookup vname venv of
-    Just _ -> ((LCODE "", fenv, venv), "%" ++ vname)
+    Just _ -> ((LCODE "", fenv, venv, benv), "%" ++ vname)
     Nothing ->
       ( ( LCODE ("\t%" ++ vname ++ " = alloca i32, align 4\n")
         , fenv
-        , venv ++ [(vname, PTR ("%" ++ vname))])
+        , venv ++ [(vname, PTR ("%" ++ vname))]
+        , benv)
       , "%" ++ vname)
-codePrepStoreExpr fenv venv _ =
-  ((ERROR "The left term of `=` should be a variable name.", fenv, venv), "")
+codePrepStoreExpr fenv venv benv _ =
+  ( (ERROR "The left term of `=` should be a variable name.", fenv, venv, benv)
+  , "")
 
-codeGenBinaryExpr :: FEnv -> VEnv -> ExprAST -> ((Code, FEnv, VEnv), String)
-codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
+codeGenBinaryExpr ::
+     FEnv -> VEnv -> BEnv -> ExprAST -> ((Code, FEnv, VEnv, BEnv), String)
+codeGenBinaryExpr fenv venv benv (BinaryExprAST op lhs rhs) =
   case op of
     '+' ->
       ( ( codeAppend intermediateCode (fADD lterm rterm newVar)
         , fenv
-        , venvLR ++ [(newVar, SYM newVar)])
+        , venvLR ++ [(newVar, SYM newVar)]
+        , benv)
       , newVar)
     '-' ->
       ( ( codeAppend intermediateCode (fSUB lterm rterm newVar)
         , fenv
-        , venvLR ++ [(newVar, SYM newVar)])
+        , venvLR ++ [(newVar, SYM newVar)]
+        , benv)
       , newVar)
     '*' ->
       ( ( codeAppend intermediateCode (fMUL lterm rterm newVar)
         , fenv
-        , venvLR ++ [(newVar, SYM newVar)])
+        , venvLR ++ [(newVar, SYM newVar)]
+        , benv)
       , newVar)
     '<' ->
       ( ( codeAppend intermediateCode (fCmpULT lterm rterm newVar)
         , fenv
-        , venvLR ++ [(newVar, SYM newVar)])
+        , venvLR ++ [(newVar, SYM newVar)]
+        , benv)
       , newVar)
     '=' ->
       ( ( codeAppends
@@ -477,11 +548,12 @@ codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
             , LCODE (", i32* " ++ (snd prepStoreExpr) ++ ", align 4")
             ]
         , fenv
-        , (_getVEnv (fst prepStoreExpr)))
+        , (_getVEnv (fst prepStoreExpr))
+        , benv)
       , snd prepStoreExpr)
-    _ -> ((ERROR "invalid binary operator", fenv, venvLR), newVar)
+    _ -> ((ERROR "invalid binary operator", fenv, venvLR, benv), newVar)
   where
-    lbranch = codeGenBinaryExpr fenv venv lhs
+    lbranch = codeGenBinaryExpr fenv venv benv lhs
     intermediateCodeL =
       if needIntermediateVar lhs venv
         then codeAppend (_getCode (fst lbranch)) (LCODE "\n")
@@ -494,7 +566,7 @@ codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
       if needIntermediateVar lhs venv
         then venv ++ (_getVEnv (fst lbranch))
         else venv
-    rbranch = codeGenBinaryExpr fenv venvL rhs
+    rbranch = codeGenBinaryExpr fenv venvL benv rhs
     intermediateCodeR =
       if needIntermediateVar rhs venv
         then codeAppend (_getCode (fst rbranch)) (LCODE "\n")
@@ -520,21 +592,26 @@ codeGenBinaryExpr fenv venv (BinaryExprAST op lhs rhs) =
         then []
         else [last rvenv]
     prepStoreExpr =
-      codePrepStoreExpr fenv (rvenv_last ++ venv) (BinaryExprAST op lhs rhs)
-codeGenBinaryExpr fenv venv (CallExprAST fname argExprs) =
+      codePrepStoreExpr
+        fenv
+        (rvenv_last ++ venv)
+        benv
+        (BinaryExprAST op lhs rhs)
+codeGenBinaryExpr fenv venv benv (CallExprAST fname argExprs) =
   (callResult, fst (last (_getVEnv callResult)))
   where
-    callResult = codeGen fenv venv (CallExprAST fname argExprs)
-codeGenBinaryExpr fenv venv (VariableExprAST x) =
+    callResult = codeGen fenv venv benv (CallExprAST fname argExprs)
+codeGenBinaryExpr fenv venv benv (VariableExprAST x) =
   case lookup x venv of
     Just (PTR ptr) ->
       ( ( LCODE ("\t" ++ v ++ " = load i32, i32* " ++ ptr ++ ", align 4")
         , fenv
-        , venv ++ [(v, SYM v)])
+        , venv ++ [(v, SYM v)]
+        , benv)
       , v)
       where v = generateNewVarName ptr venv
-    _ -> (codeGen fenv venv (VariableExprAST x), "")
-codeGenBinaryExpr fenv venv exp = (codeGen fenv venv exp, "")
+    _ -> (codeGen fenv venv benv (VariableExprAST x), "")
+codeGenBinaryExpr fenv venv benv exp = (codeGen fenv venv benv exp, "")
 
 joinWithComma :: [Code] -> String
 joinWithComma [] = ""

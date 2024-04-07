@@ -38,14 +38,14 @@ main = do
     , 12)
   let selfassign0 = "def main() {a=2; a=a+5;}"
       sa0 = parseTop selfassign0 0 []
-      codesa0 = codeGen [] [] (sa0 !! 0)
+      codesa0 = codeGen [] [] [] (sa0 !! 0)
   check
     "test-selfassign"
     (code2str (_getCode codesa0))
     "define i32 @main() {\nentry:\n\t%a = alloca i32, align 4\n\tstore i32 2, i32* %a, align 4\n\t%a1 = load i32, i32* %a, align 4\n\t%addtmp0 = add i32 %a1, 5\n\tstore i32 %addtmp0, i32* %a, align 4\n\t%a0 = load i32, i32* %a, align 4\n\tret i32 %a0\n}\n"
   let for0 = "def main() {for (a=1; a<2; a=a+1) in b=2;}"
       topfor0 = parseTop for0 0 []
-      codefor0 = codeGen [] [] (topfor0 !! 0)
+      codefor0 = codeGen [] [] [] (topfor0 !! 0)
   check
     "test-for"
     topfor0
@@ -80,7 +80,7 @@ main = do
   check "test-Extern" top2 [PrototypeAST "sin" ["a"]]
   let source3 = "4+5;"
       top3 = parseTop source3 0 []
-      code3 = codeGen [] [] (top3 !! 0)
+      code3 = codeGen [] [] [] (top3 !! 0)
   check
     "test-SimpleAdd-AST"
     top3
@@ -94,9 +94,10 @@ main = do
     "define i32 @0() {\nentry:\n\t%addtmp0 = add i32 4, 5\n\tret i32 %addtmp0\n}\n"
   let source4 = "def foo(a b) a*a+2*a*b+b*b;"
       top4 = parseTop source4 0 []
-      code4 = codeGen [] [] (top4 !! 0)
+      code4 = codeGen [] [] [] (top4 !! 0)
       top4' = parseTop "def bar(a b) foo(a, 4)+bar(2, b);" 0 []
-      code4' = codeGen (_getFEnv code4) (_getVEnv code4) (top4' !! 0)
+      code4' =
+        codeGen (_getFEnv code4) (_getVEnv code4) (_getBEnv code4) (top4' !! 0)
   check
     "test-SimpleOp-AST"
     top4
@@ -123,7 +124,7 @@ main = do
     "define i32 @bar(i32 %a, i32 %b) {\nentry:\n\t%calltmp0 = call i32 @foo(i32 %a, i32 4)\n\t%calltmp1 = call i32 @bar(i32 2, i32 %b)\n\t%addtmp2 = add i32 %calltmp0, %calltmp1\n\tret i32 %addtmp2\n}\n"
   let source5 = "def fib(x) if x<3 then 1 else fib(x-1)+fib(x-2);"
       top5 = parseTop source5 0 []
-      code5 = codeGen [] [] (top5 !! 0)
+      code5 = codeGen [] [] [] (top5 !! 0)
   check
     "test-Fib-AST"
     top5

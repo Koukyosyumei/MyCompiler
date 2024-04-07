@@ -12,6 +12,7 @@ main = do
   args <- getArgs
   let source = head args
       top = parseTop source 0 []
-      code = codeGens [] [] top
-    -- putStrLn (show top)
+      code = codeGens top
+  putStrLn (show (_getVEnv code))
+  putStrLn (show (_getBEnv code))
   putStrLn (code2str (_getCode code))
