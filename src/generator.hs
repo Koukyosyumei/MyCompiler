@@ -171,7 +171,7 @@ codeGen fenv venv benv (FunctionAST prototype body) =
         (benv ++ [("entry", SYM "entry")])
         body
     localVars = _getVEnv bodyCODE
-    retInstr_ = _getVal ((snd . last) localVars) venv
+    retInstr_ = _getVal ((snd . last) localVars) (_getVEnv bodyCODE)
     retInstr =
       case (fst retInstr_) of
         "" -> ("", snd retInstr_)
@@ -261,9 +261,7 @@ codeGen fenv venv benv (ForAST startAST endAST stepAST bodyAST) =
             then []
             else [last venv])
   , (_getBEnv stepCode)
-      ++ [ (label_loop, SYM label_loop)
-         , (label_body, SYM label_body)
-         , (label_exit_loop, SYM label_exit_loop)
+      ++ [ (label_exit_loop, SYM label_exit_loop)
          ])
   where
     label_loop = generateNewBlockName "loop" benv
@@ -272,8 +270,29 @@ codeGen fenv venv benv (ForAST startAST endAST stepAST bodyAST) =
     label_initialindex = generateNewVarName "initial_index" venv
     label_index = generateNewVarName "index" venv
     label_nextindex = generateNewVarName "next_index" venv
-    startCode = codeGen fenv venv benv startAST
+
+    startCode = codeGen fenv venv (benv ++ [(label_loop, SYM label_loop)]) startAST
     counterVar = fst (last (_getVEnv startCode))
+    endCode =
+      codeGen
+        fenv
+        ((_getVEnv startCode) ++ [(label_index, SYM ("%" ++ label_index))])
+        (_getBEnv startCode)
+        (replaceVarName endAST counterVar label_index)
+    prev_entry = fst (last benv)
+    bodyCode =
+      codeGen
+        fenv
+        (_getVEnv endCode)
+        ((_getBEnv endCode) ++ [(label_body, SYM label_body)])
+        (replaceVarName bodyAST counterVar label_index)
+    stepCode =
+      codeGen
+        fenv
+        (_getVEnv bodyCode)
+        (_getBEnv bodyCode)
+        (replaceVarName stepAST counterVar label_index)
+
     entrySection =
       codeAppends
         [ (_getCode startCode)
@@ -285,13 +304,6 @@ codeGen fenv venv benv (ForAST startAST endAST stepAST bodyAST) =
                ++ ", align 4")
         , LCODE ("\n\tbr label %" ++ label_loop ++ "\n")
         ]
-    endCode =
-      codeGen
-        fenv
-        ((_getVEnv startCode) ++ [(label_index, SYM ("%" ++ label_index))])
-        (_getBEnv startCode)
-        (replaceVarName endAST counterVar label_index)
-    prev_entry = fst (last benv)
     loopSection =
       codeAppends
         [ LCODE (label_loop ++ ":\n")
@@ -306,7 +318,7 @@ codeGen fenv venv benv (ForAST startAST endAST stepAST bodyAST) =
                ++ " ], [ %"
                ++ label_nextindex
                ++ ", %"
-               ++ label_body
+               ++ (fst (last (_getBEnv bodyCode)))
                ++ " ]\n")
         , (_getCode endCode)
         , LCODE
@@ -318,18 +330,6 @@ codeGen fenv venv benv (ForAST startAST endAST stepAST bodyAST) =
                ++ label_exit_loop
                ++ "\n")
         ]
-    bodyCode =
-      codeGen
-        fenv
-        (_getVEnv endCode)
-        (_getBEnv endCode)
-        (replaceVarName bodyAST counterVar label_index)
-    stepCode =
-      codeGen
-        fenv
-        (_getVEnv bodyCode)
-        (_getBEnv bodyCode)
-        (replaceVarName stepAST counterVar label_index)
     bodySection =
       codeAppends
         [ LCODE (label_body ++ ":\n")
